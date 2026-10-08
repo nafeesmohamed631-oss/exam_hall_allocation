@@ -5,13 +5,13 @@
 <div class="page-header">
   <div>
     <h1 class="page-title"><i class="fa-solid fa-building-columns" style="color: var(--primary);"></i> Examination Halls</h1>
-    <p class="page-subtitle">Configure examination halls, desk layout dimensions, and GridFS visual maps</p>
+    <p class="page-subtitle">Configure examination halls, row &amp; column desk capacities, and layout maps</p>
   </div>
 </div>
 
 <div class="card">
   <div class="card-header">
-    <h2 class="card-title"><i class="fa-solid fa-square-plus" style="color: var(--primary);"></i> Add Examination Hall</h2>
+    <h2 class="card-title"><i class="fa-solid fa-plus-circle" style="color: var(--primary);"></i> Add Examination Hall</h2>
   </div>
   <form method="post" action="{{ url_for('hall_add') }}" enctype="multipart/form-data" class="grid">
     <div>
@@ -31,7 +31,7 @@
       <input name="columns" type="number" min="1" value="6" title="Columns" required>
     </div>
     <div>
-      <label>Hall Photo / Layout (GridFS)</label>
+      <label>Hall Photo (Optional)</label>
       <input name="image" type="file" accept="image/*">
     </div>
     <div>
@@ -40,9 +40,6 @@
       </button>
     </div>
   </form>
-  <div class="muted small-text" style="margin-top: 0.75rem;">
-    <i class="fa-solid fa-circle-info" style="color: var(--primary);"></i> Hall images are streamed securely from MongoDB GridFS database storage.
-  </div>
 </div>
 
 <form class="filters" method="get">
@@ -60,6 +57,7 @@
       <option value="{{ k }}" {{ 'selected' if sort == k }}>{{ l }}</option>
     {% endfor %}
   </select>
+
   <button type="submit" class="btn small"><i class="fa-solid fa-check"></i> Apply</button>
   {% if request.args.get('building') %}
     <a href="{{ url_for('halls_page') }}" class="btn small secondary"><i class="fa-solid fa-xmark"></i> Reset</a>
@@ -69,65 +67,41 @@
 <div class="cards-grid">
   {% for h in items %}
   <div class="hall-card">
-    <div class="hall-img-wrapper">
-      {% if h.image %}
-        <img class="hall-img" src="{{ url_for('media', file_id=h.image.gridfs_id) }}" alt="{{ h.hall_name }}">
-      {% else %}
-        <div class="hall-img placeholder">
-          <i class="fa-solid fa-image" style="font-size: 2.5rem;"></i>
-          <span>No hall photo uploaded</span>
+    {% if h.image %}
+      <img class="hall-img-preview" src="{{ url_for('media', file_id=h.image.gridfs_id) }}" alt="{{ h.hall_name }}">
+    {% endif %}
+
+    <div class="hall-header-compact">
+      <div>
+        <h3>{{ h.hall_name }}</h3>
+        <div class="hall-location">
+          <i class="fa-solid fa-location-dot" style="color: var(--danger);"></i>
+          <span>{{ h.building or 'Main Campus' }}</span>
         </div>
-      {% endif %}
+      </div>
+      <span class="badge primary" style="font-size: 0.82rem;">
+        <i class="fa-solid fa-chair"></i> {{ h.capacity }} Seats
+      </span>
     </div>
+
     <div class="hall-body">
-      <h3>{{ h.hall_name }}</h3>
-      <p class="muted" style="margin-bottom: 0.5rem;">
-        <i class="fa-solid fa-location-dot" style="color: #ef4444;"></i> {{ h.building or 'Main Campus' }}
-      </p>
-      
-      <div style="margin: 0.5rem 0;">
+      <div class="hall-metrics">
         <span class="tag accent">
-          <i class="fa-solid fa-border-all"></i> {{ h.rows }} rows × {{ h.columns }} cols
+          <i class="fa-solid fa-border-all"></i> {{ h.rows }} Rows × {{ h.columns }} Columns
         </span>
-        <span class="tag" style="background: #ecfdf5; color: #065f46; border-color: #a7f3d0;">
-          <i class="fa-solid fa-chair"></i> {{ h.capacity }} Total Seats
-        </span>
+        {% if h.image %}
+          <span class="tag" style="background: var(--success-bg); color: var(--success-text); border-color: var(--success-border);">
+            <i class="fa-solid fa-image"></i> Photo Attached
+          </span>
+        {% endif %}
       </div>
 
-      {% if h.image %}
-        <p class="muted small-text" style="margin-top: 0.25rem;">
-          <i class="fa-solid fa-database"></i> GridFS: {{ h.image.filename }} ({{ (h.image.size / 1024)|round(1) }} KB)
-        </p>
-      {% endif %}
-
       <div class="hall-actions">
-        <details style="flex: 1;">
-          <summary><i class="fa-solid fa-pen-to-square"></i> Edit Layout</summary>
-          <form method="post" action="{{ url_for('hall_edit', hid=h._id) }}" enctype="multipart/form-data" class="stack">
-            <div>
-              <label>Hall Name</label>
-              <input name="hall_name" value="{{ h.hall_name }}" required>
-            </div>
-            <div>
-              <label>Building</label>
-              <input name="building" value="{{ h.building }}">
-            </div>
-            <div>
-              <label>Rows</label>
-              <input name="rows" type="number" min="1" max="26" value="{{ h.rows }}" required>
-            </div>
-            <div>
-              <label>Columns</label>
-              <input name="columns" type="number" min="1" value="{{ h.columns }}" required>
-            </div>
-            <div>
-              <label>Replace Image</label>
-              <input name="image" type="file" accept="image/*">
-            </div>
-            <button type="submit" class="btn small success"><i class="fa-solid fa-check"></i> Save Changes</button>
-          </form>
-        </details>
-        <form method="post" action="{{ url_for('hall_delete', hid=h._id) }}" data-confirm="Delete this hall, its stored GridFS image, and any linked seat allotments?">
+        <button type="button" class="btn small secondary" onclick="openModal('edit-hall-{{ h._id }}')">
+          <i class="fa-solid fa-pen-to-square"></i> Edit Layout
+        </button>
+
+        <form method="post" action="{{ url_for('hall_delete', hid=h._id) }}" data-confirm="Are you sure you want to delete {{ h.hall_name }} and its allotments?">
           <button type="submit" class="btn small danger" title="Delete Hall">
             <i class="fa-solid fa-trash-can"></i>
           </button>
@@ -135,10 +109,55 @@
       </div>
     </div>
   </div>
+
+  <!-- Edit Hall Modal -->
+  <div id="edit-hall-{{ h._id }}" class="modal-overlay">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 class="modal-title"><i class="fa-solid fa-pen-to-square" style="color: var(--primary);"></i> Edit Hall: {{ h.hall_name }}</h3>
+        <button type="button" class="modal-close" onclick="closeModal('edit-hall-{{ h._id }}')">&times;</button>
+      </div>
+      <form method="post" action="{{ url_for('hall_edit', hid=h._id) }}" enctype="multipart/form-data">
+        <div class="modal-body stack">
+          <div>
+            <label>Hall Name</label>
+            <input name="hall_name" value="{{ h.hall_name }}" required>
+          </div>
+          <div>
+            <label>Building / Block</label>
+            <input name="building" value="{{ h.building }}">
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+            <div>
+              <label>Rows (1-26)</label>
+              <input name="rows" type="number" min="1" max="26" value="{{ h.rows }}" required>
+            </div>
+            <div>
+              <label>Columns</label>
+              <input name="columns" type="number" min="1" value="{{ h.columns }}" required>
+            </div>
+          </div>
+          <div>
+            <label>Replace Hall Photo (Optional)</label>
+            <input name="image" type="file" accept="image/*">
+            {% if h.image %}
+              <div class="small-text muted" style="margin-top: 0.25rem;">
+                Current file: {{ h.image.filename }}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn secondary" onclick="closeModal('edit-hall-{{ h._id }}')">Cancel</button>
+          <button type="submit" class="btn success"><i class="fa-solid fa-check"></i> Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
   {% else %}
-  <div class="card center muted" style="grid-column: 1 / -1; padding: 3rem;">
-    <i class="fa-solid fa-school" style="font-size: 2.5rem; display: block; margin-bottom: 0.75rem; opacity: 0.4;"></i>
-    No examination halls added yet. Use the form above to add your first hall.
+  <div class="card center muted" style="grid-column: 1 / -1; padding: 2.5rem;">
+    <i class="fa-solid fa-building-columns" style="font-size: 2rem; display: block; margin-bottom: 0.5rem; opacity: 0.4;"></i>
+    No examination halls configured yet. Add your first hall using the form above.
   </div>
   {% endfor %}
 </div>

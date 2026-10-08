@@ -5,14 +5,14 @@
 <div class="page-header">
   <div>
     <h1 class="page-title"><i class="fa-solid fa-gauge-high" style="color: var(--primary);"></i> Admin Dashboard</h1>
-    <p class="page-subtitle">Overview of examination scheduling, hall capacities, and student allocations</p>
+    <p class="page-subtitle">Overview of examinations, candidate registrations, and hall capacities</p>
   </div>
   <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
     <a href="{{ url_for('seatings_page') }}" class="btn">
       <i class="fa-solid fa-wand-magic-sparkles"></i> Generate Seating
     </a>
     <a href="{{ url_for('exams_page') }}" class="btn secondary">
-      <i class="fa-solid fa-plus"></i> New Exam
+      <i class="fa-solid fa-plus"></i> Schedule Exam
     </a>
   </div>
 </div>
@@ -30,7 +30,7 @@
       {% elif 'seat' in k %}
         <i class="fa-solid fa-chair"></i>
       {% else %}
-        <i class="fa-solid fa-photo-film"></i>
+        <i class="fa-solid fa-image"></i>
       {% endif %}
     </div>
     <div class="stat-info">
@@ -43,28 +43,28 @@
 
 <div class="card">
   <div class="card-header">
-    <h2 class="card-title"><i class="fa-solid fa-diagram-project" style="color: var(--accent);"></i> Arrangement Workflow</h2>
+    <h2 class="card-title"><i class="fa-solid fa-diagram-project" style="color: var(--primary);"></i> Examination Workflow</h2>
   </div>
-  <div class="workflow-steps" style="margin-top: 0;">
+  <div class="workflow-steps">
     <div class="step-box">
       <div class="step-number">1</div>
       <div class="step-title">Master Data Setup</div>
       <div class="step-desc">
-        Add <a href="{{ url_for('students_page') }}">Students</a>, configure <a href="{{ url_for('halls_page') }}">Exam Halls</a> (with layout and GridFS images), and create <a href="{{ url_for('exams_page') }}">Exams</a>.
+        Register <a href="{{ url_for('students_page') }}">Students</a>, create <a href="{{ url_for('halls_page') }}">Exam Halls</a>, and schedule <a href="{{ url_for('exams_page') }}">Exams</a>.
       </div>
     </div>
     <div class="step-box">
       <div class="step-number">2</div>
-      <div class="step-title">Smart Allocation</div>
+      <div class="step-title">Automatic Seating Allocation</div>
       <div class="step-desc">
-        Open <a href="{{ url_for('seatings_page') }}">Seatings</a> to automatically allot students across eligible halls with clash detection.
+        Run automatic arrangement from <a href="{{ url_for('seatings_page') }}">Seatings</a> with clash detection across date/time slots.
       </div>
     </div>
     <div class="step-box">
       <div class="step-number">3</div>
       <div class="step-title">Export &amp; Notify</div>
       <div class="step-desc">
-        Download printable PDF charts or dispatch Email/SMS notifications to candidates from the <a href="{{ url_for('exams_page') }}">Exams</a> panel.
+        Download printable PDF charts or send notifications to candidates on the <a href="{{ url_for('exams_page') }}">Exams</a> page.
       </div>
     </div>
   </div>
@@ -82,8 +82,8 @@
           <th>Register No</th>
           <th>Student Name</th>
           <th>Subject / Exam</th>
-          <th>Hall Location</th>
-          <th>Allotted Seat</th>
+          <th>Hall</th>
+          <th>Seat</th>
         </tr>
       </thead>
       <tbody>
@@ -91,15 +91,15 @@
         <tr>
           <td><span class="tag"><strong>{{ r.register_no }}</strong></span></td>
           <td><strong>{{ r.student.name }}</strong></td>
-          <td>{{ r.exam.subject }} <span class="muted">({{ r.exam.exam_name }})</span></td>
-          <td><i class="fa-solid fa-building text-muted"></i> {{ r.hall.hall_name }}</td>
-          <td><span class="badge primary" style="font-size: 0.9rem; font-weight: 700;">{{ r.seat_no }}</span></td>
+          <td>{{ r.exam.subject }} <span class="muted small-text">({{ r.exam.exam_name }})</span></td>
+          <td><i class="fa-solid fa-building-columns muted"></i> {{ r.hall.hall_name }}</td>
+          <td><span class="badge primary">{{ r.seat_no }}</span></td>
         </tr>
         {% else %}
         <tr>
           <td colspan="5" class="center muted" style="padding: 2rem;">
             <i class="fa-solid fa-inbox" style="font-size: 2rem; display: block; margin-bottom: 0.5rem; opacity: 0.4;"></i>
-            No allotments generated yet. <a href="{{ url_for('seatings_page') }}">Generate your first arrangement</a>.
+            No allotments generated yet. <a href="{{ url_for('seatings_page') }}">Generate seating arrangement</a>.
           </td>
         </tr>
         {% endfor %}

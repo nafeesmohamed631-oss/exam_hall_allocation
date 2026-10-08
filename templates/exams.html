@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Examinations{% endblock %}
+{% block title %}Examinations Schedule{% endblock %}
 
 {% block content %}
 <div class="page-header">
   <div>
-    <h1 class="page-title"><i class="fa-solid fa-file-pen" style="color: var(--primary);"></i> Exam Management</h1>
-    <p class="page-subtitle">Schedule examinations, download official seating chart PDFs, and notify students</p>
+    <h1 class="page-title"><i class="fa-solid fa-file-pen" style="color: var(--primary);"></i> Exam Schedule</h1>
+    <p class="page-subtitle">Schedule examinations, download printable seating PDFs, and notify students</p>
   </div>
 </div>
 
@@ -20,10 +20,10 @@
     </div>
     <div>
       <label>Subject</label>
-      <input name="subject" placeholder="e.g. Data Structures & Algorithms" required>
+      <input name="subject" placeholder="e.g. Data Structures" required>
     </div>
     <div>
-      <label>Date</label>
+      <label>Exam Date</label>
       <input name="exam_date" type="date" required>
     </div>
     <div>
@@ -31,7 +31,7 @@
       <input name="start_time" type="time" required>
     </div>
     <div>
-      <label>Duration (Minutes)</label>
+      <label>Duration (Mins)</label>
       <input name="duration" type="number" value="180" min="15" required>
     </div>
     <div>
@@ -43,15 +43,17 @@
 </div>
 
 <form class="filters" method="get">
-  <label><i class="fa-solid fa-filter" style="color: var(--primary);"></i> Filter by Date:</label>
+  <label><i class="fa-solid fa-filter" style="color: var(--primary);"></i> Date:</label>
   <input type="date" name="date" value="{{ request.args.get('date', '') }}">
+
   <label>Sort:</label>
   <select name="sort">
     {% for k, l in sorts %}
       <option value="{{ k }}" {{ 'selected' if sort == k }}>{{ l }}</option>
     {% endfor %}
   </select>
-  <button type="submit" class="btn small"><i class="fa-solid fa-check"></i> Apply Filters</button>
+
+  <button type="submit" class="btn small"><i class="fa-solid fa-check"></i> Apply</button>
   {% if request.args.get('date') %}
     <a href="{{ url_for('exams_page') }}" class="btn small secondary"><i class="fa-solid fa-xmark"></i> Clear</a>
   {% endif %}
@@ -63,9 +65,9 @@
       <tr>
         <th>Exam Title</th>
         <th>Subject</th>
-        <th>Date &amp; Time</th>
+        <th>Schedule</th>
         <th>Duration</th>
-        <th>Allotted</th>
+        <th>Seated</th>
         <th>Actions</th>
       </tr>
     </thead>
@@ -81,24 +83,43 @@
         <td>{{ e.duration }} mins</td>
         <td>
           <span class="badge {% if counts.get(e._id, 0) > 0 %}success{% else %}primary{% endif %}">
-            <i class="fa-solid fa-chair"></i> {{ counts.get(e._id, 0) }} seated
+            <i class="fa-solid fa-chair"></i> {{ counts.get(e._id, 0) }} candidates
           </span>
         </td>
         <td>
-          <a class="btn small" href="{{ url_for('seatings_page', exam=e._id) }}" title="View and assign seating">
-            <i class="fa-solid fa-users-viewfinder"></i> Seats
-          </a>
-          <a class="btn small secondary" href="{{ url_for('exam_pdf', eid=e._id) }}" title="Download Printable PDF">
-            <i class="fa-solid fa-file-pdf" style="color: #ef4444;"></i> PDF
-          </a>
-          <form method="post" action="{{ url_for('exam_notify', eid=e._id) }}" data-confirm="Send email/SMS notification to all seated candidates for this exam?">
-            <button type="submit" class="btn small secondary" title="Notify Candidates">
-              <i class="fa-solid fa-paper-plane" style="color: var(--primary);"></i> Notify
+          <div style="display: flex; gap: 0.35rem; align-items: center;">
+            <a class="btn small" href="{{ url_for('seatings_page', exam=e._id) }}" title="View and assign seating">
+              <i class="fa-solid fa-users-viewfinder"></i> Seats
+            </a>
+            <a class="btn small secondary" href="{{ url_for('exam_pdf', eid=e._id) }}" title="Download Printable PDF">
+              <i class="fa-solid fa-file-pdf" style="color: var(--danger);"></i> PDF
+            </a>
+            <form method="post" action="{{ url_for('exam_notify', eid=e._id) }}" data-confirm="Send email/SMS notification to all candidates seated for this exam?">
+              <button type="submit" class="btn small secondary" title="Notify candidates">
+                <i class="fa-solid fa-paper-plane" style="color: var(--primary);"></i>
+              </button>
+            </form>
+            <button type="button" class="btn small secondary" onclick="openModal('edit-exam-{{ e._id }}')" title="Edit exam details">
+              <i class="fa-solid fa-pen-to-square"></i>
             </button>
-          </form>
-          <details>
-            <summary><i class="fa-solid fa-pen-to-square"></i> Edit</summary>
-            <form method="post" action="{{ url_for('exam_edit', eid=e._id) }}" class="stack">
+            <form method="post" action="{{ url_for('exam_delete', eid=e._id) }}" data-confirm="Are you sure you want to delete this exam and its seating arrangement?">
+              <button type="submit" class="btn small danger" title="Delete exam">
+                <i class="fa-solid fa-trash-can"></i>
+              </button>
+            </form>
+          </div>
+        </td>
+      </tr>
+
+      <!-- Edit Exam Modal -->
+      <div id="edit-exam-{{ e._id }}" class="modal-overlay">
+        <div class="modal-dialog">
+          <div class="modal-header">
+            <h3 class="modal-title"><i class="fa-solid fa-pen-to-square" style="color: var(--primary);"></i> Edit Exam Details</h3>
+            <button type="button" class="modal-close" onclick="closeModal('edit-exam-{{ e._id }}')">&times;</button>
+          </div>
+          <form method="post" action="{{ url_for('exam_edit', eid=e._id) }}">
+            <div class="modal-body stack">
               <div>
                 <label>Exam Name</label>
                 <input name="exam_name" value="{{ e.exam_name }}" required>
@@ -107,33 +128,33 @@
                 <label>Subject</label>
                 <input name="subject" value="{{ e.subject }}" required>
               </div>
-              <div>
-                <label>Date</label>
-                <input name="exam_date" type="date" value="{{ e.exam_date }}" required>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                <div>
+                  <label>Exam Date</label>
+                  <input name="exam_date" type="date" value="{{ e.exam_date }}" required>
+                </div>
+                <div>
+                  <label>Start Time</label>
+                  <input name="start_time" type="time" value="{{ e.start_time }}" required>
+                </div>
               </div>
               <div>
-                <label>Time</label>
-                <input name="start_time" type="time" value="{{ e.start_time }}" required>
-              </div>
-              <div>
-                <label>Duration (mins)</label>
+                <label>Duration (Minutes)</label>
                 <input name="duration" type="number" value="{{ e.duration }}" required>
               </div>
-              <button type="submit" class="btn small success"><i class="fa-solid fa-check"></i> Save Changes</button>
-            </form>
-          </details>
-          <form method="post" action="{{ url_for('exam_delete', eid=e._id) }}" data-confirm="Are you sure you want to delete this exam and its seating arrangement?">
-            <button type="submit" class="btn small danger" title="Delete Exam">
-              <i class="fa-solid fa-trash-can"></i>
-            </button>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn secondary" onclick="closeModal('edit-exam-{{ e._id }}')">Cancel</button>
+              <button type="submit" class="btn success"><i class="fa-solid fa-check"></i> Save Changes</button>
+            </div>
           </form>
-        </td>
-      </tr>
+        </div>
+      </div>
       {% else %}
       <tr>
         <td colspan="6" class="center muted" style="padding: 2.5rem;">
           <i class="fa-solid fa-file-circle-question" style="font-size: 2rem; display: block; margin-bottom: 0.5rem; opacity: 0.4;"></i>
-          No examinations scheduled yet. Use the form above to add your first exam.
+          No examinations scheduled yet. Use the form above to schedule your first exam.
         </td>
       </tr>
       {% endfor %}

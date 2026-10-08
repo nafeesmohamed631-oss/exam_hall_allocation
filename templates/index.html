@@ -1,42 +1,41 @@
 {% extends "base.html" %}
 {% block title %}Find My Seat{% endblock %}
-{% block body_class %}bg-public{% endblock %}
 
 {% block content %}
-<div class="hero-section">
-  <div class="brand-icon" style="margin: 0 auto 1rem auto; width: 48px; height: 48px; font-size: 1.5rem;">
+<div class="search-hero">
+  <div class="brand-icon" style="margin: 0 auto 0.75rem auto; width: 44px; height: 44px; font-size: 1.25rem;">
     <i class="fa-solid fa-graduation-cap"></i>
   </div>
-  <h1 class="hero-title" style="justify-content: center;">Find Your Examination Hall &amp; Seat</h1>
-  <p class="hero-subtitle">Enter your student register number below to instantly view your allocated examination hall, desk location, and hall layout.</p>
+  <h1>Student Examination Seat Finder</h1>
+  <p>Enter your university register number to check your allotted hall, desk number, and exam schedule.</p>
 
-  <div class="search-box-card">
-    <form id="lookupForm" class="search-form">
-      <input id="regInput" placeholder="Enter Register No. (e.g. 21CS001, REG101)" required autofocus>
+  <div class="search-bar-wrap">
+    <form id="lookupForm">
+      <input id="regInput" placeholder="Enter Register Number (e.g. 21CS001)" required autofocus>
       <button type="submit" class="btn">
-        <i class="fa-solid fa-magnifying-glass"></i> Search Seat
+        <i class="fa-solid fa-magnifying-glass"></i> Search
       </button>
     </form>
   </div>
 </div>
 
-<div class="workflow-steps" style="margin-bottom: 2rem;">
+<div class="workflow-steps" style="margin-bottom: 1.5rem;">
   <div class="step-box">
     <div class="step-number"><i class="fa-solid fa-bolt"></i></div>
-    <div class="step-title">Instant Allotment</div>
-    <div class="step-desc">Get your room number, desk code, and exam schedule in real time.</div>
+    <div class="step-title">Instant Room &amp; Desk</div>
+    <div class="step-desc">Quickly find your exact hall code and row/column desk number.</div>
   </div>
   <div class="step-box">
-    <div class="step-number"><i class="fa-solid fa-image"></i></div>
-    <div class="step-title">Hall Photo Preview</div>
-    <div class="step-desc">View the hall picture stored on campus servers for quick navigation.</div>
+    <div class="step-number"><i class="fa-solid fa-building-columns"></i></div>
+    <div class="step-title">Hall Location &amp; Map</div>
+    <div class="step-desc">View the hall building name and layout photo if uploaded by campus staff.</div>
   </div>
   <div class="step-box">
-    <div class="step-number"><i class="fa-solid fa-shield-check"></i></div>
-    <div class="step-title">Verified Seating</div>
-    <div class="step-desc">Guaranteed conflict-free automatic arrangement by the university system.</div>
+    <div class="step-number"><i class="fa-solid fa-clock"></i></div>
+    <div class="step-title">Timetable &amp; Schedule</div>
+    <div class="step-desc">Check the exam start time, duration, and subject details in real time.</div>
   </div>
 </div>
 
-<div id="result" class="result-container"></div>
+<div id="result"></div>
 {% endblock %}
