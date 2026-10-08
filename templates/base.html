@@ -1,33 +1,78 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>{% block title %}Exam Seating System{% endblock %}</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Exam Seating System{% endblock %} - ExamSeat Portal</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-<body>
-<header class="nav">
-  <a class="brand" href="{{ url_for('index') }}">🎓 ExamSeat</a>
-  <nav>
-    {% if session.admin %}
-      <a href="{{ url_for('dashboard') }}">Dashboard</a>
-      <a href="{{ url_for('students_page') }}">Students</a>
-      <a href="{{ url_for('exams_page') }}">Exams</a>
-      <a href="{{ url_for('halls_page') }}">Halls</a>
-      <a href="{{ url_for('seatings_page') }}">Seatings</a>
-      <a href="{{ url_for('logout') }}">Logout</a>
-    {% else %}
-      <a href="{{ url_for('index') }}">Find my seat</a>
-      <a href="{{ url_for('login') }}">Admin login</a>
-    {% endif %}
-  </nav>
+<body class="{% block body_class %}{% endblock %}">
+
+<header class="nav-header">
+  <div class="nav-container">
+    <a class="brand" href="{{ url_for('index') }}">
+      <span class="brand-icon"><i class="fa-solid fa-graduation-cap"></i></span>
+      <span>ExamSeat</span>
+      <span class="brand-badge">Portal</span>
+    </a>
+    <nav class="nav-links">
+      {% if session.admin %}
+        <a class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}">
+          <i class="fa-solid fa-chart-pie"></i> Dashboard
+        </a>
+        <a class="nav-link {% if request.endpoint == 'students_page' %}active{% endif %}" href="{{ url_for('students_page') }}">
+          <i class="fa-solid fa-user-graduate"></i> Students
+        </a>
+        <a class="nav-link {% if request.endpoint == 'exams_page' %}active{% endif %}" href="{{ url_for('exams_page') }}">
+          <i class="fa-solid fa-file-pen"></i> Exams
+        </a>
+        <a class="nav-link {% if request.endpoint == 'halls_page' %}active{% endif %}" href="{{ url_for('halls_page') }}">
+          <i class="fa-solid fa-building-columns"></i> Halls
+        </a>
+        <a class="nav-link {% if request.endpoint == 'seatings_page' %}active{% endif %}" href="{{ url_for('seatings_page') }}">
+          <i class="fa-solid fa-chair"></i> Seatings
+        </a>
+        <a class="nav-link logout-btn" href="{{ url_for('logout') }}">
+          <i class="fa-solid fa-arrow-right-from-bracket"></i> Logout
+        </a>
+      {% else %}
+        <a class="nav-link {% if request.endpoint == 'index' %}active{% endif %}" href="{{ url_for('index') }}">
+          <i class="fa-solid fa-magnifying-glass"></i> Find My Seat
+        </a>
+        <a class="nav-link login-btn {% if request.endpoint == 'login' %}active{% endif %}" href="{{ url_for('login') }}">
+          <i class="fa-solid fa-shield-halved"></i> Admin Login
+        </a>
+      {% endif %}
+    </nav>
+  </div>
 </header>
+
 <main class="container">
-  {% for cat, msg in get_flashed_messages(with_categories=true) %}
-    <div class="flash {{ cat }}">{{ msg }}</div>
-  {% endfor %}
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="flash-container">
+        {% for cat, msg in messages %}
+          <div class="flash {{ cat }}">
+            <i class="fa-solid {% if cat == 'success' %}fa-circle-check{% else %}fa-triangle-exclamation{% endif %}"></i>
+            <span>{{ msg }}</span>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
   {% block content %}{% endblock %}
 </main>
+
+<footer class="footer">
+  <div class="nav-container" style="justify-content: center; gap: 0.5rem;">
+    <span>&copy; {{ now().year if now is defined else '2026' }} Exam Seating &amp; Hall Allotment System</span>
+    <span>•</span>
+    <span>Automated Smart Allocation</span>
+  </div>
+</footer>
+
 <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>

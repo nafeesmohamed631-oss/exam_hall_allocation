@@ -1,10 +1,42 @@
-{% extends "base.html" %}{% block title %}Find my seat{% endblock %}{% block content %}
-<div class="card narrow">
-  <h1>Find your exam hall &amp; seat</h1>
-  <form id="lookupForm" class="row">
-    <input id="regInput" placeholder="Enter register number" required>
-    <button class="btn">Search</button>
-  </form>
+{% extends "base.html" %}
+{% block title %}Find My Seat{% endblock %}
+{% block body_class %}bg-public{% endblock %}
+
+{% block content %}
+<div class="hero-section">
+  <div class="brand-icon" style="margin: 0 auto 1rem auto; width: 48px; height: 48px; font-size: 1.5rem;">
+    <i class="fa-solid fa-graduation-cap"></i>
+  </div>
+  <h1 class="hero-title" style="justify-content: center;">Find Your Examination Hall &amp; Seat</h1>
+  <p class="hero-subtitle">Enter your student register number below to instantly view your allocated examination hall, desk location, and hall layout.</p>
+
+  <div class="search-box-card">
+    <form id="lookupForm" class="search-form">
+      <input id="regInput" placeholder="Enter Register No. (e.g. 21CS001, REG101)" required autofocus>
+      <button type="submit" class="btn">
+        <i class="fa-solid fa-magnifying-glass"></i> Search Seat
+      </button>
+    </form>
+  </div>
 </div>
-<div id="result"></div>
+
+<div class="workflow-steps" style="margin-bottom: 2rem;">
+  <div class="step-box">
+    <div class="step-number"><i class="fa-solid fa-bolt"></i></div>
+    <div class="step-title">Instant Allotment</div>
+    <div class="step-desc">Get your room number, desk code, and exam schedule in real time.</div>
+  </div>
+  <div class="step-box">
+    <div class="step-number"><i class="fa-solid fa-image"></i></div>
+    <div class="step-title">Hall Photo Preview</div>
+    <div class="step-desc">View the hall picture stored on campus servers for quick navigation.</div>
+  </div>
+  <div class="step-box">
+    <div class="step-number"><i class="fa-solid fa-shield-check"></i></div>
+    <div class="step-title">Verified Seating</div>
+    <div class="step-desc">Guaranteed conflict-free automatic arrangement by the university system.</div>
+  </div>
+</div>
+
+<div id="result" class="result-container"></div>
 {% endblock %}

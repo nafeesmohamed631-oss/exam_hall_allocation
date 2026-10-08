@@ -1,48 +1,168 @@
-{% extends "base.html" %}{% block title %}Students{% endblock %}{% block content %}
-<h1>Students</h1>
+{% extends "base.html" %}
+{% block title %}Students Directory{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title"><i class="fa-solid fa-user-graduate" style="color: var(--primary);"></i> Student Directory</h1>
+    <p class="page-subtitle">Manage registered candidate profiles and view their embedded exam allocations</p>
+  </div>
+</div>
+
 <div class="card">
-  <h2>Add student</h2>
+  <div class="card-header">
+    <h2 class="card-title"><i class="fa-solid fa-user-plus" style="color: var(--primary);"></i> Add New Student</h2>
+  </div>
   <form method="post" action="{{ url_for('student_add') }}" class="grid">
-    <input name="register_no" placeholder="Register no" required>
-    <input name="name" placeholder="Name" required>
-    <input name="department" placeholder="Department (e.g. CSE)" required>
-    <input name="year" type="number" min="1" max="6" placeholder="Year" value="1" required>
-    <input name="email" type="email" placeholder="Email">
-    <input name="phone" placeholder="Phone (+91...)">
-    <button class="btn">Add</button>
+    <div>
+      <label>Register Number</label>
+      <input name="register_no" placeholder="e.g. 21CS001" required>
+    </div>
+    <div>
+      <label>Student Full Name</label>
+      <input name="name" placeholder="e.g. Alex Johnson" required>
+    </div>
+    <div>
+      <label>Department</label>
+      <input name="department" placeholder="e.g. CSE, ECE, MECH" required>
+    </div>
+    <div>
+      <label>Academic Year (1-6)</label>
+      <input name="year" type="number" min="1" max="6" placeholder="Year" value="1" required>
+    </div>
+    <div>
+      <label>Email Address</label>
+      <input name="email" type="email" placeholder="student@university.edu">
+    </div>
+    <div>
+      <label>Phone (+91...)</label>
+      <input name="phone" placeholder="+91 9876543210">
+    </div>
+    <div>
+      <button type="submit" class="btn" style="width: 100%;">
+        <i class="fa-solid fa-plus"></i> Add Student
+      </button>
+    </div>
   </form>
 </div>
+
 <form class="filters" method="get">
-  <input name="q" placeholder="Search name / register no" value="{{ request.args.get('q', '') }}">
-  <select name="department"><option value="">All departments</option>
-    {% for d in departments %}<option {{ 'selected' if request.args.get('department') == d }}>{{ d }}</option>{% endfor %}</select>
-  <select name="exam"><option value="">Any exam</option>
-    {% for e in exams %}<option value="{{ e._id }}" {{ 'selected' if request.args.get('exam') == e._id|string }}>{{ e.exam_name }} - {{ e.subject }}</option>{% endfor %}</select>
-  <select name="sort">{% for k, l in sorts %}<option value="{{ k }}" {{ 'selected' if sort == k }}>{{ l }}</option>{% endfor %}</select>
-  <button class="btn">Apply</button>
+  <label><i class="fa-solid fa-magnifying-glass" style="color: var(--primary);"></i> Search:</label>
+  <input name="q" placeholder="Search by name or register no…" value="{{ request.args.get('q', '') }}">
+  
+  <label>Department:</label>
+  <select name="department">
+    <option value="">All Departments</option>
+    {% for d in departments %}
+      <option {{ 'selected' if request.args.get('department') == d }}>{{ d }}</option>
+    {% endfor %}
+  </select>
+
+  <label>Exam:</label>
+  <select name="exam">
+    <option value="">Any Examination</option>
+    {% for e in exams %}
+      <option value="{{ e._id }}" {{ 'selected' if request.args.get('exam') == e._id|string }}>
+        {{ e.exam_name }} - {{ e.subject }}
+      </option>
+    {% endfor %}
+  </select>
+
+  <label>Sort By:</label>
+  <select name="sort">
+    {% for k, l in sorts %}
+      <option value="{{ k }}" {{ 'selected' if sort == k }}>{{ l }}</option>
+    {% endfor %}
+  </select>
+
+  <button type="submit" class="btn small"><i class="fa-solid fa-filter"></i> Apply</button>
+  {% if request.args.get('q') or request.args.get('department') or request.args.get('exam') %}
+    <a href="{{ url_for('students_page') }}" class="btn small secondary"><i class="fa-solid fa-xmark"></i> Clear</a>
+  {% endif %}
 </form>
-<div class="card scroll"><table>
-  <tr><th>Register no</th><th>Name</th><th>Dept</th><th>Year</th><th>Email</th><th>Embedded exam_details</th><th>Actions</th></tr>
-  {% for s in items %}
-  <tr>
-    <td>{{ s.register_no }}</td><td>{{ s.name }}</td><td>{{ s.department }}</td><td>{{ s.year }}</td><td>{{ s.email }}</td>
-    <td>{% for d in s.exam_details %}<span class="tag">{{ d.subject }} · {{ halls.get(d.hall_id, {}).hall_name }} · {{ d.seat_no }}</span>{% else %}<span class="muted">-</span>{% endfor %}</td>
-    <td>
-      <details><summary>Edit</summary>
-        <form method="post" action="{{ url_for('student_edit', sid=s._id) }}" class="stack">
-          <input name="register_no" value="{{ s.register_no }}" required>
-          <input name="name" value="{{ s.name }}" required>
-          <input name="department" value="{{ s.department }}" required>
-          <input name="year" type="number" value="{{ s.year }}" required>
-          <input name="email" type="email" value="{{ s.email }}">
-          <input name="phone" value="{{ s.phone }}">
-          <button class="btn small">Save</button>
-        </form>
-      </details>
-      <form method="post" action="{{ url_for('student_delete', sid=s._id) }}" data-confirm="Delete {{ s.name }} and their allotments?">
-        <button class="btn small danger">Delete</button></form>
-    </td>
-  </tr>
-  {% else %}<tr><td colspan="7" class="muted">No students found.</td></tr>{% endfor %}
-</table></div>
+
+<div class="card scroll">
+  <table>
+    <thead>
+      <tr>
+        <th>Register No</th>
+        <th>Student Name</th>
+        <th>Dept &amp; Year</th>
+        <th>Contact Info</th>
+        <th>Active Allotments</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in items %}
+      <tr>
+        <td><span class="tag"><strong>{{ s.register_no }}</strong></span></td>
+        <td><strong>{{ s.name }}</strong></td>
+        <td>
+          <span class="badge primary">{{ s.department }}</span>
+          <span class="muted small-text">Year {{ s.year }}</span>
+        </td>
+        <td>
+          {% if s.email %}<div><i class="fa-regular fa-envelope muted"></i> {{ s.email }}</div>{% endif %}
+          {% if s.phone %}<div><i class="fa-solid fa-phone muted"></i> {{ s.phone }}</div>{% endif %}
+          {% if not s.email and not s.phone %}<span class="muted">-</span>{% endif %}
+        </td>
+        <td>
+          {% for d in s.exam_details %}
+            <span class="tag accent">
+              <i class="fa-solid fa-book-open"></i> {{ d.subject }} · {{ halls.get(d.hall_id, {}).hall_name or 'Hall' }} · <strong>{{ d.seat_no }}</strong>
+            </span>
+          {% else %}
+            <span class="muted small-text">No seating assigned</span>
+          {% endfor %}
+        </td>
+        <td>
+          <details>
+            <summary><i class="fa-solid fa-pen-to-square"></i> Edit</summary>
+            <form method="post" action="{{ url_for('student_edit', sid=s._id) }}" class="stack">
+              <div>
+                <label>Register No</label>
+                <input name="register_no" value="{{ s.register_no }}" required>
+              </div>
+              <div>
+                <label>Name</label>
+                <input name="name" value="{{ s.name }}" required>
+              </div>
+              <div>
+                <label>Department</label>
+                <input name="department" value="{{ s.department }}" required>
+              </div>
+              <div>
+                <label>Year</label>
+                <input name="year" type="number" value="{{ s.year }}" required>
+              </div>
+              <div>
+                <label>Email</label>
+                <input name="email" type="email" value="{{ s.email }}">
+              </div>
+              <div>
+                <label>Phone</label>
+                <input name="phone" value="{{ s.phone }}">
+              </div>
+              <button type="submit" class="btn small success"><i class="fa-solid fa-check"></i> Save Changes</button>
+            </form>
+          </details>
+          <form method="post" action="{{ url_for('student_delete', sid=s._id) }}" data-confirm="Are you sure you want to delete student {{ s.name }} and their allotments?">
+            <button type="submit" class="btn small danger" title="Delete Student">
+              <i class="fa-solid fa-trash-can"></i>
+            </button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="6" class="center muted" style="padding: 2.5rem;">
+          <i class="fa-solid fa-users-slash" style="font-size: 2rem; display: block; margin-bottom: 0.5rem; opacity: 0.4;"></i>
+          No students found matching the selected criteria.
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
 {% endblock %}
