@@ -1,0 +1,10 @@
+{% extends "base.html" %}{% block title %}Find my seat{% endblock %}{% block content %}
+<div class="card narrow">
+  <h1>Find your exam hall &amp; seat</h1>
+  <form id="lookupForm" class="row">
+    <input id="regInput" placeholder="Enter register number" required>
+    <button class="btn">Search</button>
+  </form>
+</div>
+<div id="result"></div>
+{% endblock %}

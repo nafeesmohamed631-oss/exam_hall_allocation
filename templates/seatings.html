@@ -1,0 +1,42 @@
+{% extends "base.html" %}{% block title %}Seatings{% endblock %}{% block content %}
+<h1>Seating arrangement</h1>
+<div class="card">
+  <h2>Generate automatically</h2>
+  <form method="post" action="{{ url_for('seatings_generate') }}" class="grid">
+    <select name="exam_id" required><option value="">Select exam</option>
+      {% for e in exams %}<option value="{{ e._id }}" {{ 'selected' if request.args.get('exam') == e._id|string }}>{{ e.exam_name }} - {{ e.subject }} ({{ e.exam_date }})</option>{% endfor %}</select>
+    <select name="department"><option value="">All departments</option>{% for d in departments %}<option>{{ d }}</option>{% endfor %}</select>
+    <select name="hall_ids" multiple size="3" title="Hold Ctrl to pick halls (none = all available)">
+      {% for h in halls %}<option value="{{ h._id }}">{{ h.hall_name }} ({{ h.capacity }})</option>{% endfor %}</select>
+    <button class="btn">Generate</button>
+  </form>
+  <p class="muted">Students are sorted by register number in MongoDB and filled hall by hall. Halls already used by another exam at the same date/time are skipped. Re-generating replaces the previous arrangement for that exam.</p>
+</div>
+<form class="filters" method="get">
+  <input name="q" placeholder="Register no starts with…" value="{{ request.args.get('q', '') }}">
+  <select name="exam"><option value="">All exams</option>
+    {% for e in exams %}<option value="{{ e._id }}" {{ 'selected' if request.args.get('exam') == e._id|string }}>{{ e.exam_name }} - {{ e.subject }}</option>{% endfor %}</select>
+  <select name="hall"><option value="">All halls</option>
+    {% for h in halls %}<option value="{{ h._id }}" {{ 'selected' if request.args.get('hall') == h._id|string }}>{{ h.hall_name }}</option>{% endfor %}</select>
+  <select name="sort">{% for k, l in sorts %}<option value="{{ k }}" {{ 'selected' if sort == k }}>{{ l }}</option>{% endfor %}</select>
+  <button class="btn">Apply</button>
+</form>
+<div class="card scroll"><table>
+  <tr><th>Register no</th><th>Name</th><th>Exam</th><th>Hall</th><th>Seat</th><th>Actions</th></tr>
+  {% for r in items %}
+  <tr>
+    <td>{{ r.register_no }}</td><td>{{ r.student.name }}</td><td>{{ r.exam.subject }}</td><td>{{ r.hall.hall_name }}</td><td>{{ r.seat_no }}</td>
+    <td>
+      <details><summary>Reassign</summary>
+        <form method="post" action="{{ url_for('seating_edit', sid=r._id) }}" class="stack">
+          <select name="hall_id">{% for h in halls %}<option value="{{ h._id }}" {{ 'selected' if h._id == r.hall_id }}>{{ h.hall_name }}</option>{% endfor %}</select>
+          <input name="seat_no" value="{{ r.seat_no }}" placeholder="e.g. B3" required>
+          <button class="btn small">Save</button>
+        </form>
+      </details>
+      <form method="post" action="{{ url_for('seating_delete', sid=r._id) }}" data-confirm="Remove this allotment?"><button class="btn small danger">Remove</button></form>
+    </td>
+  </tr>
+  {% else %}<tr><td colspan="6" class="muted">No allotments found.</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

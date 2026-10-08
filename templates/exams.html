@@ -1,0 +1,43 @@
+{% extends "base.html" %}{% block title %}Exams{% endblock %}{% block content %}
+<h1>Exams</h1>
+<div class="card">
+  <h2>Create exam</h2>
+  <form method="post" action="{{ url_for('exam_add') }}" class="grid">
+    <input name="exam_name" placeholder="Exam name" required>
+    <input name="subject" placeholder="Subject" required>
+    <input name="exam_date" type="date" required>
+    <input name="start_time" type="time" required>
+    <input name="duration" type="number" value="180" min="15" required>
+    <button class="btn">Create</button>
+  </form>
+</div>
+<form class="filters" method="get">
+  <label>Date <input type="date" name="date" value="{{ request.args.get('date', '') }}"></label>
+  <select name="sort">{% for k, l in sorts %}<option value="{{ k }}" {{ 'selected' if sort == k }}>{{ l }}</option>{% endfor %}</select>
+  <button class="btn">Apply</button>
+</form>
+<div class="card scroll"><table>
+  <tr><th>Exam</th><th>Subject</th><th>Date</th><th>Time</th><th>Min</th><th>Seated</th><th>Actions</th></tr>
+  {% for e in items %}
+  <tr>
+    <td>{{ e.exam_name }}</td><td>{{ e.subject }}</td><td>{{ e.exam_date }}</td><td>{{ e.start_time }}</td><td>{{ e.duration }}</td><td>{{ counts.get(e._id, 0) }}</td>
+    <td>
+      <a class="btn small" href="{{ url_for('seatings_page', exam=e._id) }}">Seats</a>
+      <a class="btn small" href="{{ url_for('exam_pdf', eid=e._id) }}">PDF</a>
+      <form method="post" action="{{ url_for('exam_notify', eid=e._id) }}" data-confirm="Send email/SMS to all seated students?"><button class="btn small">Notify</button></form>
+      <details><summary>Edit</summary>
+        <form method="post" action="{{ url_for('exam_edit', eid=e._id) }}" class="stack">
+          <input name="exam_name" value="{{ e.exam_name }}" required>
+          <input name="subject" value="{{ e.subject }}" required>
+          <input name="exam_date" type="date" value="{{ e.exam_date }}" required>
+          <input name="start_time" type="time" value="{{ e.start_time }}" required>
+          <input name="duration" type="number" value="{{ e.duration }}" required>
+          <button class="btn small">Save</button>
+        </form>
+      </details>
+      <form method="post" action="{{ url_for('exam_delete', eid=e._id) }}" data-confirm="Delete this exam and its seating?"><button class="btn small danger">Delete</button></form>
+    </td>
+  </tr>
+  {% else %}<tr><td colspan="7" class="muted">No exams yet.</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

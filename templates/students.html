@@ -1,0 +1,48 @@
+{% extends "base.html" %}{% block title %}Students{% endblock %}{% block content %}
+<h1>Students</h1>
+<div class="card">
+  <h2>Add student</h2>
+  <form method="post" action="{{ url_for('student_add') }}" class="grid">
+    <input name="register_no" placeholder="Register no" required>
+    <input name="name" placeholder="Name" required>
+    <input name="department" placeholder="Department (e.g. CSE)" required>
+    <input name="year" type="number" min="1" max="6" placeholder="Year" value="1" required>
+    <input name="email" type="email" placeholder="Email">
+    <input name="phone" placeholder="Phone (+91...)">
+    <button class="btn">Add</button>
+  </form>
+</div>
+<form class="filters" method="get">
+  <input name="q" placeholder="Search name / register no" value="{{ request.args.get('q', '') }}">
+  <select name="department"><option value="">All departments</option>
+    {% for d in departments %}<option {{ 'selected' if request.args.get('department') == d }}>{{ d }}</option>{% endfor %}</select>
+  <select name="exam"><option value="">Any exam</option>
+    {% for e in exams %}<option value="{{ e._id }}" {{ 'selected' if request.args.get('exam') == e._id|string }}>{{ e.exam_name }} - {{ e.subject }}</option>{% endfor %}</select>
+  <select name="sort">{% for k, l in sorts %}<option value="{{ k }}" {{ 'selected' if sort == k }}>{{ l }}</option>{% endfor %}</select>
+  <button class="btn">Apply</button>
+</form>
+<div class="card scroll"><table>
+  <tr><th>Register no</th><th>Name</th><th>Dept</th><th>Year</th><th>Email</th><th>Embedded exam_details</th><th>Actions</th></tr>
+  {% for s in items %}
+  <tr>
+    <td>{{ s.register_no }}</td><td>{{ s.name }}</td><td>{{ s.department }}</td><td>{{ s.year }}</td><td>{{ s.email }}</td>
+    <td>{% for d in s.exam_details %}<span class="tag">{{ d.subject }} · {{ halls.get(d.hall_id, {}).hall_name }} · {{ d.seat_no }}</span>{% else %}<span class="muted">-</span>{% endfor %}</td>
+    <td>
+      <details><summary>Edit</summary>
+        <form method="post" action="{{ url_for('student_edit', sid=s._id) }}" class="stack">
+          <input name="register_no" value="{{ s.register_no }}" required>
+          <input name="name" value="{{ s.name }}" required>
+          <input name="department" value="{{ s.department }}" required>
+          <input name="year" type="number" value="{{ s.year }}" required>
+          <input name="email" type="email" value="{{ s.email }}">
+          <input name="phone" value="{{ s.phone }}">
+          <button class="btn small">Save</button>
+        </form>
+      </details>
+      <form method="post" action="{{ url_for('student_delete', sid=s._id) }}" data-confirm="Delete {{ s.name }} and their allotments?">
+        <button class="btn small danger">Delete</button></form>
+    </td>
+  </tr>
+  {% else %}<tr><td colspan="7" class="muted">No students found.</td></tr>{% endfor %}
+</table></div>
+{% endblock %}

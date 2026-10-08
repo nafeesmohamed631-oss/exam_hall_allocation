@@ -1,0 +1,7 @@
+Flask>=3.0
+pymongo>=4.6
+Flask-Mail>=0.9.1
+reportlab>=4.0
+python-dotenv>=1.0
+# Optional SMS notifications (only needed if you set TWILIO_* variables)
+# twilio>=9.0

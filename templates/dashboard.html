@@ -1,0 +1,23 @@
+{% extends "base.html" %}{% block title %}Dashboard{% endblock %}{% block content %}
+<h1>Admin dashboard</h1>
+<div class="stats">
+  {% for k, v in stats.items() %}<div class="stat"><b>{{ v }}</b><span>{{ k.replace('_', ' ')|title }}</span></div>{% endfor %}
+</div>
+<div class="card">
+  <h2>Workflow</h2>
+  <ol>
+    <li>Create an <a href="{{ url_for('exams_page') }}">exam</a>, add <a href="{{ url_for('students_page') }}">students</a> and <a href="{{ url_for('halls_page') }}">halls</a> (upload hall images - stored in GridFS).</li>
+    <li>Open <a href="{{ url_for('seatings_page') }}">Seatings</a> and generate the arrangement.</li>
+    <li>Download the PDF / send notifications from the <a href="{{ url_for('exams_page') }}">Exams</a> page.</li>
+  </ol>
+</div>
+<div class="card">
+  <h2>Latest allotments</h2>
+  <div class="scroll"><table>
+    <tr><th>Register no</th><th>Name</th><th>Exam</th><th>Hall</th><th>Seat</th></tr>
+    {% for r in recent %}
+    <tr><td>{{ r.register_no }}</td><td>{{ r.student.name }}</td><td>{{ r.exam.subject }}</td><td>{{ r.hall.hall_name }}</td><td>{{ r.seat_no }}</td></tr>
+    {% else %}<tr><td colspan="5" class="muted">No allotments yet.</td></tr>{% endfor %}
+  </table></div>
+</div>
+{% endblock %}

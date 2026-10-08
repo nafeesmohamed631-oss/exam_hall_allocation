@@ -1,0 +1,43 @@
+{% extends "base.html" %}{% block title %}Halls{% endblock %}{% block content %}
+<h1>Examination halls</h1>
+<div class="card">
+  <h2>Add hall</h2>
+  <form method="post" action="{{ url_for('hall_add') }}" enctype="multipart/form-data" class="grid">
+    <input name="hall_name" placeholder="Hall name" required>
+    <input name="building" placeholder="Building">
+    <input name="rows" type="number" min="1" max="26" value="5" title="Rows (max 26)" required>
+    <input name="columns" type="number" min="1" value="6" title="Columns" required>
+    <input name="image" type="file" accept="image/*">
+    <button class="btn">Add</button>
+  </form>
+  <p class="muted">The image is stored in MongoDB GridFS; the hall document keeps its <code>image.gridfs_id</code>.</p>
+</div>
+<form class="filters" method="get">
+  <select name="building"><option value="">All buildings</option>
+    {% for b in buildings %}<option {{ 'selected' if request.args.get('building') == b }}>{{ b }}</option>{% endfor %}</select>
+  <select name="sort">{% for k, l in sorts %}<option value="{{ k }}" {{ 'selected' if sort == k }}>{{ l }}</option>{% endfor %}</select>
+  <button class="btn">Apply</button>
+</form>
+<div class="cards">
+  {% for h in items %}
+  <div class="card">
+    {% if h.image %}<img class="hall-img" src="{{ url_for('media', file_id=h.image.gridfs_id) }}" alt="{{ h.hall_name }}">
+    {% else %}<div class="hall-img placeholder">No image</div>{% endif %}
+    <h3>{{ h.hall_name }}</h3>
+    <p class="muted">{{ h.building }} · {{ h.rows }}×{{ h.columns }} = {{ h.capacity }} seats</p>
+    {% if h.image %}<p class="muted small-text">GridFS: {{ h.image.filename }} ({{ h.image.size }} bytes)</p>{% endif %}
+    <details><summary>Edit</summary>
+      <form method="post" action="{{ url_for('hall_edit', hid=h._id) }}" enctype="multipart/form-data" class="stack">
+        <input name="hall_name" value="{{ h.hall_name }}" required>
+        <input name="building" value="{{ h.building }}">
+        <input name="rows" type="number" min="1" max="26" value="{{ h.rows }}" required>
+        <input name="columns" type="number" min="1" value="{{ h.columns }}" required>
+        <label>Replace image <input name="image" type="file" accept="image/*"></label>
+        <button class="btn small">Save</button>
+      </form>
+    </details>
+    <form method="post" action="{{ url_for('hall_delete', hid=h._id) }}" data-confirm="Delete hall, its image and allotments?"><button class="btn small danger">Delete</button></form>
+  </div>
+  {% else %}<p class="muted">No halls yet.</p>{% endfor %}
+</div>
+{% endblock %}
