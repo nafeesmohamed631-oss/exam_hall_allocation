@@ -1,48 +1,70 @@
 {% extends "base.html" %}
-{% block title %}Examination Halls{% endblock %}
+{% block title %}Halls Management{% endblock %}
 
 {% block content %}
-<div class="page-header">
-  <div>
-    <h1 class="page-title"><i class="fa-solid fa-building-columns" style="color: var(--primary);"></i> Examination Halls</h1>
-    <p class="page-subtitle">Configure examination halls, row &amp; column desk capacities, and layout maps</p>
-  </div>
-</div>
+<a class="breadcrumb-back" href="{{ url_for('dashboard') }}">
+  <i class="fa-solid fa-arrow-left"></i> Back to Dashboard
+</a>
 
-<div class="card">
-  <div class="card-header">
-    <h2 class="card-title"><i class="fa-solid fa-plus-circle" style="color: var(--primary);"></i> Add Examination Hall</h2>
-  </div>
-  <form method="post" action="{{ url_for('hall_add') }}" enctype="multipart/form-data" class="grid">
-    <div>
-      <label>Hall Name</label>
-      <input name="hall_name" placeholder="e.g. Hall A, LH-101" required>
+<h1 class="page-heading">Examination Halls</h1>
+<p class="page-subtitle">Configure examination halls, row &amp; column desk dimensions, and GridFS visual maps</p>
+
+<div class="form-card">
+  <form method="post" action="{{ url_for('hall_add') }}" enctype="multipart/form-data">
+    <div class="form-section">
+      <div class="form-section-title">
+        <i class="fa-solid fa-building" style="color: var(--primary);"></i>
+        <span>Hall &amp; Location Information</span>
+      </div>
+      <div class="form-grid-2">
+        <div>
+          <label>Hall Name</label>
+          <input name="hall_name" placeholder="e.g. Hall A, LH-101" required>
+        </div>
+        <div>
+          <label>Building / Block</label>
+          <input name="building" placeholder="e.g. Main Block, Science Wing">
+        </div>
+      </div>
     </div>
-    <div>
-      <label>Building / Block</label>
-      <input name="building" placeholder="e.g. Science Block, West Wing">
+
+    <div class="form-section">
+      <div class="form-section-title">
+        <i class="fa-solid fa-border-all" style="color: var(--primary);"></i>
+        <span>Desk Layout Matrix (Nested Document: <code>layout</code>)</span>
+      </div>
+      <div class="form-grid-2">
+        <div>
+          <label>Rows (1 to 26: A-Z)</label>
+          <input name="rows" type="number" min="1" max="26" value="4" required>
+        </div>
+        <div>
+          <label>Columns (Desks per row)</label>
+          <input name="columns" type="number" min="1" value="5" required>
+        </div>
+      </div>
     </div>
-    <div>
-      <label>Rows (Max 26: A-Z)</label>
-      <input name="rows" type="number" min="1" max="26" value="5" title="Rows (max 26)" required>
+
+    <div class="form-section">
+      <div class="form-section-title">
+        <i class="fa-solid fa-image" style="color: var(--primary);"></i>
+        <span>Hall Photo / Layout Map (Embedded MongoDB GridFS)</span>
+      </div>
+      <div>
+        <label>Upload Image (PNG, JPG, WEBP - Max 5MB)</label>
+        <input name="image" type="file" accept="image/*">
+      </div>
     </div>
-    <div>
-      <label>Columns (Seats per row)</label>
-      <input name="columns" type="number" min="1" value="6" title="Columns" required>
-    </div>
-    <div>
-      <label>Hall Photo (Optional)</label>
-      <input name="image" type="file" accept="image/*">
-    </div>
-    <div>
-      <button type="submit" class="btn" style="width: 100%;">
-        <i class="fa-solid fa-plus"></i> Add Hall
+
+    <div class="form-actions">
+      <button type="submit" class="btn">
+        <i class="fa-solid fa-plus"></i> Save Hall Configuration
       </button>
     </div>
   </form>
 </div>
 
-<form class="filters" method="get">
+<form class="filter-card" method="get">
   <label><i class="fa-solid fa-filter" style="color: var(--primary);"></i> Building:</label>
   <select name="building">
     <option value="">All Buildings</option>
@@ -51,7 +73,7 @@
     {% endfor %}
   </select>
 
-  <label>Sort By:</label>
+  <label>Sort:</label>
   <select name="sort">
     {% for k, l in sorts %}
       <option value="{{ k }}" {{ 'selected' if sort == k }}>{{ l }}</option>
@@ -66,32 +88,35 @@
 
 <div class="cards-grid">
   {% for h in items %}
+  {% set rows = h.get('layout', {}).get('rows') or h.rows or 5 %}
+  {% set cols = h.get('layout', {}).get('columns') or h.columns or 6 %}
+  {% set cap = h.get('layout', {}).get('capacity') or h.capacity or (rows * cols) %}
+  
   <div class="hall-card">
     {% if h.image %}
       <img class="hall-img-preview" src="{{ url_for('media', file_id=h.image.gridfs_id) }}" alt="{{ h.hall_name }}">
     {% endif %}
 
-    <div class="hall-header-compact">
-      <div>
-        <h3>{{ h.hall_name }}</h3>
-        <div class="hall-location">
-          <i class="fa-solid fa-location-dot" style="color: var(--danger);"></i>
-          <span>{{ h.building or 'Main Campus' }}</span>
-        </div>
-      </div>
-      <span class="badge primary" style="font-size: 0.82rem;">
-        <i class="fa-solid fa-chair"></i> {{ h.capacity }} Seats
-      </span>
-    </div>
-
     <div class="hall-body">
-      <div class="hall-metrics">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.6rem;">
+        <div>
+          <h3 style="font-size: 1.15rem; font-weight: 700; margin: 0 0 0.15rem 0;">{{ h.hall_name }}</h3>
+          <div class="muted small-text">
+            <i class="fa-solid fa-location-dot" style="color: var(--danger);"></i> {{ h.building or 'Main Campus' }}
+          </div>
+        </div>
+        <span class="badge primary">
+          <i class="fa-solid fa-chair"></i> {{ cap }} Seats
+        </span>
+      </div>
+
+      <div style="margin: 0.5rem 0 1rem 0; display: flex; flex-wrap: wrap; gap: 0.4rem;">
         <span class="tag accent">
-          <i class="fa-solid fa-border-all"></i> {{ h.rows }} Rows × {{ h.columns }} Columns
+          <i class="fa-solid fa-border-all"></i> {{ rows }} rows × {{ cols }} cols
         </span>
         {% if h.image %}
           <span class="tag" style="background: var(--success-bg); color: var(--success-text); border-color: var(--success-border);">
-            <i class="fa-solid fa-image"></i> Photo Attached
+            <i class="fa-solid fa-database"></i> GridFS Media
           </span>
         {% endif %}
       </div>
@@ -101,7 +126,7 @@
           <i class="fa-solid fa-pen-to-square"></i> Edit Layout
         </button>
 
-        <form method="post" action="{{ url_for('hall_delete', hid=h._id) }}" data-confirm="Are you sure you want to delete {{ h.hall_name }} and its allotments?">
+        <form method="post" action="{{ url_for('hall_delete', hid=h._id) }}" data-confirm="Delete {{ h.hall_name }}, stored image and linked allotments?">
           <button type="submit" class="btn small danger" title="Delete Hall">
             <i class="fa-solid fa-trash-can"></i>
           </button>
@@ -114,11 +139,11 @@
   <div id="edit-hall-{{ h._id }}" class="modal-overlay">
     <div class="modal-dialog">
       <div class="modal-header">
-        <h3 class="modal-title"><i class="fa-solid fa-pen-to-square" style="color: var(--primary);"></i> Edit Hall: {{ h.hall_name }}</h3>
+        <h3 class="modal-title"><i class="fa-solid fa-pen-to-square" style="color: var(--primary);"></i> Edit: {{ h.hall_name }}</h3>
         <button type="button" class="modal-close" onclick="closeModal('edit-hall-{{ h._id }}')">&times;</button>
       </div>
       <form method="post" action="{{ url_for('hall_edit', hid=h._id) }}" enctype="multipart/form-data">
-        <div class="modal-body stack">
+        <div class="modal-body">
           <div>
             <label>Hall Name</label>
             <input name="hall_name" value="{{ h.hall_name }}" required>
@@ -127,22 +152,22 @@
             <label>Building / Block</label>
             <input name="building" value="{{ h.building }}">
           </div>
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+          <div class="form-grid-2">
             <div>
               <label>Rows (1-26)</label>
-              <input name="rows" type="number" min="1" max="26" value="{{ h.rows }}" required>
+              <input name="rows" type="number" min="1" max="26" value="{{ rows }}" required>
             </div>
             <div>
               <label>Columns</label>
-              <input name="columns" type="number" min="1" value="{{ h.columns }}" required>
+              <input name="columns" type="number" min="1" value="{{ cols }}" required>
             </div>
           </div>
           <div>
-            <label>Replace Hall Photo (Optional)</label>
+            <label>Replace Image (Optional)</label>
             <input name="image" type="file" accept="image/*">
             {% if h.image %}
               <div class="small-text muted" style="margin-top: 0.25rem;">
-                Current file: {{ h.image.filename }}
+                Current file in GridFS: {{ h.image.filename }} ({{ (h.image.size / 1024)|round(1) }} KB)
               </div>
             {% endif %}
           </div>
@@ -155,9 +180,8 @@
     </div>
   </div>
   {% else %}
-  <div class="card center muted" style="grid-column: 1 / -1; padding: 2.5rem;">
-    <i class="fa-solid fa-building-columns" style="font-size: 2rem; display: block; margin-bottom: 0.5rem; opacity: 0.4;"></i>
-    No examination halls configured yet. Add your first hall using the form above.
+  <div class="table-card" style="grid-column: 1 / -1; padding: 2.5rem; text-align: center; color: var(--text-muted);">
+    No examination halls added. Use the form above to add your first hall.
   </div>
   {% endfor %}
 </div>

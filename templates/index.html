@@ -1,40 +1,40 @@
 {% extends "base.html" %}
 {% block title %}Find My Seat{% endblock %}
 
-{% block content %}
-<div class="search-hero">
-  <div class="brand-icon" style="margin: 0 auto 0.75rem auto; width: 44px; height: 44px; font-size: 1.25rem;">
+{% block public_content %}
+<div class="form-card" style="text-align: center; padding: 2.5rem 2rem;">
+  <div class="sidebar-brand-icon" style="margin: 0 auto 0.85rem auto; width: 44px; height: 44px; font-size: 1.3rem;">
     <i class="fa-solid fa-graduation-cap"></i>
   </div>
-  <h1>Student Examination Seat Finder</h1>
-  <p>Enter your university register number to check your allotted hall, desk number, and exam schedule.</p>
+  <h1 style="font-size: 1.85rem; font-weight: 800; color: #0f172a; margin-bottom: 0.35rem;">Candidate Seat Finder</h1>
+  <p class="muted" style="max-width: 540px; margin: 0 auto 1.5rem auto;">
+    Enter your university register number to check your allocated examination hall, desk location, and exam schedule.
+  </p>
 
-  <div class="search-bar-wrap">
-    <form id="lookupForm">
-      <input id="regInput" placeholder="Enter Register Number (e.g. 21CS001)" required autofocus>
-      <button type="submit" class="btn">
-        <i class="fa-solid fa-magnifying-glass"></i> Search
-      </button>
-    </form>
-  </div>
+  <form id="lookupForm" style="max-width: 480px; margin: 0 auto; display: flex; gap: 0.5rem;">
+    <input id="regInput" placeholder="Enter Register No. (e.g. CSE20240001)" required autofocus>
+    <button type="submit" class="btn">
+      <i class="fa-solid fa-magnifying-glass"></i> Search
+    </button>
+  </form>
 </div>
 
-<div class="workflow-steps" style="margin-bottom: 1.5rem;">
-  <div class="step-box">
-    <div class="step-number"><i class="fa-solid fa-bolt"></i></div>
-    <div class="step-title">Instant Room &amp; Desk</div>
-    <div class="step-desc">Quickly find your exact hall code and row/column desk number.</div>
-  </div>
-  <div class="step-box">
-    <div class="step-number"><i class="fa-solid fa-building-columns"></i></div>
-    <div class="step-title">Hall Location &amp; Map</div>
-    <div class="step-desc">View the hall building name and layout photo if uploaded by campus staff.</div>
-  </div>
-  <div class="step-box">
-    <div class="step-number"><i class="fa-solid fa-clock"></i></div>
-    <div class="step-title">Timetable &amp; Schedule</div>
-    <div class="step-desc">Check the exam start time, duration, and subject details in real time.</div>
-  </div>
+<div id="result"></div>
+{% endblock %}
+
+{% block content %}
+<a class="breadcrumb-back" href="{{ url_for('dashboard') }}">
+  <i class="fa-solid fa-arrow-left"></i> Back to Dashboard
+</a>
+
+<h1 class="page-heading">Candidate Seat Finder</h1>
+<div class="form-card">
+  <form id="lookupForm" style="max-width: 500px; display: flex; gap: 0.5rem;">
+    <input id="regInput" placeholder="Enter Register No. (e.g. CSE20240001)" required autofocus>
+    <button type="submit" class="btn">
+      <i class="fa-solid fa-magnifying-glass"></i> Search
+    </button>
+  </form>
 </div>
 
 <div id="result"></div>

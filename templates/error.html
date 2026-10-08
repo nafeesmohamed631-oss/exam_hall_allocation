@@ -1,22 +1,37 @@
 {% extends "base.html" %}
 {% block title %}Error {{ code }}{% endblock %}
 
-{% block content %}
-<div class="auth-container center" style="max-width: 440px;">
-  <div style="font-size: 3.5rem; color: var(--danger); margin-bottom: 0.75rem;">
+{% block public_content %}
+<div class="auth-box" style="text-align: center;">
+  <div style="font-size: 3.5rem; color: var(--danger); margin-bottom: 0.5rem;">
     <i class="fa-solid fa-triangle-exclamation"></i>
   </div>
-  <h1 style="font-size: 2rem; margin-bottom: 0.35rem;">Error {{ code }}</h1>
+  <h1 style="font-size: 2rem; margin-bottom: 0.35rem;">{{ code }}</h1>
+  <p class="muted" style="margin-bottom: 1.5rem;">{{ message }}</p>
+  <a class="btn" href="{{ url_for('index') }}">
+    <i class="fa-solid fa-house"></i> Return Home
+  </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<a class="breadcrumb-back" href="{{ url_for('dashboard') }}">
+  <i class="fa-solid fa-arrow-left"></i> Back to Dashboard
+</a>
+
+<div class="form-card" style="text-align: center; max-width: 500px; margin: 2rem auto; padding: 3rem 2rem;">
+  <div style="font-size: 3.5rem; color: var(--danger); margin-bottom: 0.5rem;">
+    <i class="fa-solid fa-triangle-exclamation"></i>
+  </div>
+  <h1 style="font-size: 2rem; margin-bottom: 0.35rem;">{{ code }}</h1>
   <p class="muted" style="margin-bottom: 1.5rem;">{{ message }}</p>
   <div style="display: flex; gap: 0.5rem; justify-content: center;">
     <a class="btn" href="{{ url_for('index') }}">
-      <i class="fa-solid fa-house"></i> Go Home
+      <i class="fa-solid fa-house"></i> Home
     </a>
-    {% if session.admin %}
-      <a class="btn secondary" href="{{ url_for('dashboard') }}">
-        <i class="fa-solid fa-chart-pie"></i> Dashboard
-      </a>
-    {% endif %}
+    <a class="btn secondary" href="{{ url_for('dashboard') }}">
+      <i class="fa-solid fa-table-cells-large"></i> Dashboard
+    </a>
   </div>
 </div>
 {% endblock %}

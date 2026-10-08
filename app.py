@@ -1,5 +1,5 @@
 """Exam Hall and Seating Arrangement Management System
-Flask + MongoDB (PyMongo) + GridFS + ReportLab + Flask-Mail
+Flask + MongoDB (PyMongo) + Nested Documents & GridFS + ReportLab + Flask-Mail
 """
 import io
 import os
@@ -49,8 +49,10 @@ ALLOWED_IMAGES = {"image/png", "image/jpeg", "image/gif", "image/webp"}
 
 
 def init_db():
-    """Create indexes (enforce integrity) and the default admin account."""
+    """Create indexes (enforce integrity, nested paths) and migrate existing documents."""
     db.students.create_index("register_no", unique=True)
+    db.students.create_index("academic.department")
+    db.students.create_index("exam_details.exam_id")
     db.halls.create_index("hall_name", unique=True)
     db.seatings.create_index([("exam_id", 1), ("hall_id", 1), ("seat_no", 1)], unique=True)
     db.seatings.create_index([("exam_id", 1), ("student_id", 1)], unique=True)
@@ -61,6 +63,45 @@ def init_db():
             "password_hash": generate_password_hash(os.getenv("ADMIN_PASSWORD", "admin123")),
             "created_at": datetime.utcnow(),
         })
+
+    # Auto-migrate any existing un-nested student documents to nested schema
+    for s in db.students.find():
+        updates = {}
+        if "academic" not in s or not isinstance(s.get("academic"), dict):
+            updates["academic"] = {
+                "department": s.get("department", "CSE"),
+                "year": s.get("year", 1)
+            }
+        if "contact" not in s or not isinstance(s.get("contact"), dict):
+            updates["contact"] = {
+                "email": s.get("email", ""),
+                "phone": s.get("phone", "")
+            }
+        if "exam_details" not in s:
+            updates["exam_details"] = []
+        if updates:
+            db.students.update_one({"_id": s["_id"]}, {"$set": updates})
+
+    # Auto-migrate halls to nested layout document
+    for h in db.halls.find():
+        if "layout" not in h or not isinstance(h.get("layout"), dict):
+            r = h.get("rows", 5)
+            c = h.get("columns", 6)
+            cap = h.get("capacity", r * c)
+            db.halls.update_one({"_id": h["_id"]}, {"$set": {
+                "layout": {"rows": r, "columns": c, "capacity": cap}
+            }})
+
+    # Auto-migrate exams to nested schedule document
+    for e in db.exams.find():
+        if "schedule" not in e or not isinstance(e.get("schedule"), dict):
+            db.exams.update_one({"_id": e["_id"]}, {"$set": {
+                "schedule": {
+                    "exam_date": e.get("exam_date", ""),
+                    "start_time": e.get("start_time", ""),
+                    "duration": e.get("duration", 180)
+                }
+            }})
 
 
 # ------------------------------------------------------------------ helpers
@@ -93,15 +134,37 @@ def seat_pos(seat):
     return (ord(m.group(1)) - 65, int(m.group(2))) if m else None
 
 
+def get_hall_rows(hall):
+    if isinstance(hall.get("layout"), dict):
+        return hall["layout"].get("rows", hall.get("rows", 5))
+    return hall.get("rows", 5)
+
+
+def get_hall_cols(hall):
+    if isinstance(hall.get("layout"), dict):
+        return hall["layout"].get("columns", hall.get("columns", 6))
+    return hall.get("columns", 6)
+
+
+def get_hall_capacity(hall):
+    if isinstance(hall.get("layout"), dict):
+        return hall["layout"].get("capacity", get_hall_rows(hall) * get_hall_cols(hall))
+    return hall.get("capacity", get_hall_rows(hall) * get_hall_cols(hall))
+
+
 def seat_in_hall(hall, seat):
     pos = seat_pos(seat)
-    return bool(pos) and pos[0] < hall["rows"] and 1 <= pos[1] <= hall["columns"]
+    rows = get_hall_rows(hall)
+    cols = get_hall_cols(hall)
+    return bool(pos) and pos[0] < rows and 1 <= pos[1] <= cols
 
 
 def seat_slots(halls):
     for h in halls:
-        for r in range(h["rows"]):
-            for c in range(1, h["columns"] + 1):
+        rows = get_hall_rows(h)
+        cols = get_hall_cols(h)
+        for r in range(rows):
+            for c in range(1, cols + 1):
                 yield h, r, c
 
 
@@ -160,19 +223,45 @@ def api_lookup(reg):
     student = db.students.find_one({"register_no": reg.strip().upper()})
     if not student:
         return jsonify(error="No student found with this register number."), 404
-    rows = db.seatings.aggregate(seating_pipeline({"student_id": student["_id"]}, {"exam.exam_date": 1}))
+
+    # Use embedded exam_details if populated
     result = []
-    for r in rows:
-        img = r["hall"].get("image")
-        result.append({
-            "exam_name": r["exam"]["exam_name"], "subject": r["exam"]["subject"],
-            "exam_date": r["exam"]["exam_date"], "start_time": r["exam"]["start_time"],
-            "duration": r["exam"]["duration"], "hall_name": r["hall"]["hall_name"],
-            "building": r["hall"].get("building", ""), "seat_no": r["seat_no"],
-            "image_url": url_for("media", file_id=str(img["gridfs_id"])) if img else None,
-        })
+    if student.get("exam_details"):
+        for ed in student["exam_details"]:
+            hall = db.halls.find_one({"_id": ed.get("hall_id")})
+            img = hall.get("image") if hall else None
+            result.append({
+                "exam_name": ed.get("exam_name", ""),
+                "subject": ed.get("subject", ""),
+                "exam_date": ed.get("exam_date", ""),
+                "start_time": ed.get("start_time", ""),
+                "duration": ed.get("duration", 180),
+                "hall_name": ed.get("hall_name", "") or (hall.get("hall_name", "") if hall else ""),
+                "building": ed.get("building", "") or (hall.get("building", "") if hall else ""),
+                "seat_no": ed.get("seat_no", ""),
+                "image_url": url_for("media", file_id=str(img["gridfs_id"])) if img and img.get("gridfs_id") else None,
+            })
+    else:
+        # Fallback to aggregation
+        rows = db.seatings.aggregate(seating_pipeline({"student_id": student["_id"]}, {"exam.exam_date": 1}))
+        for r in rows:
+            img = r["hall"].get("image")
+            result.append({
+                "exam_name": r["exam"].get("exam_name", ""),
+                "subject": r["exam"].get("subject", ""),
+                "exam_date": r["exam"].get("schedule", {}).get("exam_date") or r["exam"].get("exam_date", ""),
+                "start_time": r["exam"].get("schedule", {}).get("start_time") or r["exam"].get("start_time", ""),
+                "duration": r["exam"].get("schedule", {}).get("duration") or r["exam"].get("duration", 180),
+                "hall_name": r["hall"].get("hall_name", ""),
+                "building": r["hall"].get("building", ""),
+                "seat_no": r["seat_no"],
+                "image_url": url_for("media", file_id=str(img["gridfs_id"])) if img and img.get("gridfs_id") else None,
+            })
+
+    dept = student.get("academic", {}).get("department") or student.get("department", "")
+    year = student.get("academic", {}).get("year") or student.get("year", 1)
     return jsonify(student={"register_no": student["register_no"], "name": student["name"],
-                            "department": student["department"], "year": student["year"]},
+                            "department": dept, "year": year},
                    allotments=result)
 
 
@@ -228,26 +317,48 @@ def students_page():
     q = {}
     dept, exam, search = request.args.get("department"), request.args.get("exam"), request.args.get("q", "").strip()
     if dept:
-        q["department"] = dept
+        q["$or"] = [{"academic.department": dept}, {"department": dept}]
     if exam:
-        q["exam_details.exam_id"] = oid(exam)            # query inside embedded documents
+        q["exam_details.exam_id"] = oid(exam)            # query inside embedded documents array
     if search:
         rx = {"$regex": re.escape(search), "$options": "i"}
         q["$or"] = [{"name": rx}, {"register_no": rx}]
     sort = request.args.get("sort", "reg")
     items = list(db.students.find(q).sort(STUDENT_SORTS.get(sort, STUDENT_SORTS["reg"])[1]))
+
+    depts = set(db.students.distinct("academic.department") + db.students.distinct("department"))
+    departments = sorted(d for d in depts if d)
+
     return render_template("students.html", items=items, sort=sort,
                            sorts=[(k, v[0]) for k, v in STUDENT_SORTS.items()],
-                           departments=sorted(db.students.distinct("department")),
-                           exams=list(db.exams.find().sort("exam_date", 1)),
+                           departments=departments,
+                           exams=list(db.exams.find().sort("schedule.exam_date", 1)),
                            halls={h["_id"]: h for h in db.halls.find()})
 
 
 def student_from_form():
     f = request.form
-    return {"register_no": f["register_no"].strip().upper(), "name": f["name"].strip(),
-            "department": f["department"].strip().upper(), "year": form_int("year", 1),
-            "email": f.get("email", "").strip().lower(), "phone": f.get("phone", "").strip()}
+    dept = f.get("department", "").strip().upper()
+    yr = form_int("year", 1)
+    email = f.get("email", "").strip().lower()
+    phone = f.get("phone", "").strip()
+    return {
+        "register_no": f["register_no"].strip().upper(),
+        "name": f["name"].strip(),
+        # Embedded / Nested subdocuments
+        "academic": {
+            "department": dept,
+            "year": yr
+        },
+        "contact": {
+            "email": email,
+            "phone": phone
+        },
+        "department": dept,
+        "year": yr,
+        "email": email,
+        "phone": phone
+    }
 
 
 @app.route("/admin/students/add", methods=["POST"])
@@ -289,8 +400,8 @@ def student_delete(sid):
 
 
 # -------------------------------------------------------------------- exams
-EXAM_SORTS = {"oldest": ("Oldest first", [("exam_date", 1), ("start_time", 1)]),
-              "newest": ("Newest first", [("exam_date", -1), ("start_time", -1)]),
+EXAM_SORTS = {"oldest": ("Oldest first", [("schedule.exam_date", 1), ("schedule.start_time", 1)]),
+              "newest": ("Newest first", [("schedule.exam_date", -1), ("schedule.start_time", -1)]),
               "name": ("Name (A-Z)", [("exam_name", 1)])}
 
 
@@ -299,7 +410,8 @@ EXAM_SORTS = {"oldest": ("Oldest first", [("exam_date", 1), ("start_time", 1)]),
 def exams_page():
     q = {}
     if request.args.get("date"):
-        q["exam_date"] = request.args["date"]
+        dt = request.args["date"]
+        q["$or"] = [{"schedule.exam_date": dt}, {"exam_date": dt}]
     sort = request.args.get("sort", "oldest")
     items = list(db.exams.find(q).sort(EXAM_SORTS.get(sort, EXAM_SORTS["oldest"])[1]))
     counts = {r["_id"]: r["n"] for r in db.seatings.aggregate([{"$group": {"_id": "$exam_id", "n": {"$sum": 1}}}])}
@@ -309,8 +421,22 @@ def exams_page():
 
 def exam_from_form():
     f = request.form
-    return {"exam_name": f["exam_name"].strip(), "subject": f["subject"].strip(),
-            "exam_date": f["exam_date"], "start_time": f["start_time"], "duration": form_int("duration", 180)}
+    edate = f.get("exam_date", "").strip()
+    stime = f.get("start_time", "").strip()
+    dur = form_int("duration", 180)
+    return {
+        "exam_name": f["exam_name"].strip(),
+        "subject": f["subject"].strip(),
+        # Embedded / Nested subdocument
+        "schedule": {
+            "exam_date": edate,
+            "start_time": stime,
+            "duration": dur
+        },
+        "exam_date": edate,
+        "start_time": stime,
+        "duration": dur
+    }
 
 
 @app.route("/admin/exams/add", methods=["POST"])
@@ -332,8 +458,13 @@ def exam_edit(eid):
     # keep embedded copies in students in sync
     db.students.update_many(
         {"exam_details.exam_id": oid(eid)},
-        {"$set": {"exam_details.$.subject": doc["subject"], "exam_details.$.exam_date": doc["exam_date"],
-                  "exam_details.$.start_time": doc["start_time"]}})   # positional operator: matched array element
+        {"$set": {
+            "exam_details.$.subject": doc["subject"],
+            "exam_details.$.exam_date": doc["exam_date"],
+            "exam_details.$.start_time": doc["start_time"],
+            "exam_details.$.duration": doc["duration"]
+        }}
+    )
     flash("Exam updated.", "success")
     return redirect(url_for("exams_page"))
 
@@ -360,18 +491,24 @@ def exam_pdf(eid):
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4, title="Seating Arrangement")
     story = []
+    edate = exam.get("schedule", {}).get("exam_date") or exam.get("exam_date", "")
+    stime = exam.get("schedule", {}).get("start_time") or exam.get("start_time", "")
+    dur = exam.get("schedule", {}).get("duration") or exam.get("duration", 180)
+
     for i, (_, group) in enumerate(groupby(rows, key=lambda r: r["hall"]["_id"])):
         group = list(group)
         hall = group[0]["hall"]
         if i:
             story.append(PageBreak())
         story += [Paragraph(f"Seating Arrangement - {exam['exam_name']}", styles["Title"]),
-                  Paragraph(f"{exam['subject']} | {exam['exam_date']} {exam['start_time']} | "
-                            f"{exam['duration']} min", styles["Normal"]),
+                  Paragraph(f"{exam['subject']} | {edate} {stime} | {dur} min", styles["Normal"]),
                   Paragraph(f"<b>Hall:</b> {hall['hall_name']} ({hall.get('building', '')})", styles["Heading3"]),
                   Spacer(1, 8)]
         data = [["Seat", "Register No", "Name", "Department"]] + [
-            [r["seat_no"], r["register_no"], r["student"]["name"], r["student"]["department"]] for r in group]
+            [r["seat_no"], r["register_no"], r["student"]["name"],
+             r["student"].get("academic", {}).get("department") or r["student"].get("department", "")]
+            for r in group
+        ]
         t = Table(data, repeatRows=1, colWidths=[50, 110, 220, 90])
         t.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e3a8a")),
                                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
@@ -402,17 +539,22 @@ def exam_notify(eid):
         except ImportError:
             flash("Install 'twilio' to enable SMS.", "error")
     sent = failed = 0
+    edate = exam.get("schedule", {}).get("exam_date") or exam.get("exam_date", "")
+    stime = exam.get("schedule", {}).get("start_time") or exam.get("start_time", "")
+
     for r in rows:
         s, h = r["student"], r["hall"]
+        email = s.get("contact", {}).get("email") or s.get("email")
+        phone = s.get("contact", {}).get("phone") or s.get("phone")
         text = (f"Dear {s['name']}, your {exam['subject']} exam ({exam['exam_name']}) is on "
-                f"{exam['exam_date']} at {exam['start_time']}. Hall: {h['hall_name']} "
+                f"{edate} at {stime}. Hall: {h['hall_name']} "
                 f"({h.get('building', '')}), Seat: {r['seat_no']}.")
         try:
-            if email_on and s.get("email"):
-                mail.send(Message(f"Exam seating: {exam['subject']}", recipients=[s["email"]], body=text))
+            if email_on and email:
+                mail.send(Message(f"Exam seating: {exam['subject']}", recipients=[email], body=text))
                 sent += 1
-            if sms_client and s.get("phone"):
-                sms_client.messages.create(to=s["phone"], from_=os.getenv("TWILIO_FROM"), body=text)
+            if sms_client and phone:
+                sms_client.messages.create(to=phone, from_=os.getenv("TWILIO_FROM"), body=text)
                 sent += 1
         except Exception as exc:  # noqa: BLE001
             failed += 1
@@ -423,7 +565,7 @@ def exam_notify(eid):
 
 # -------------------------------------------------------------------- halls
 HALL_SORTS = {"name": ("Name (A-Z)", [("hall_name", 1)]),
-              "capacity": ("Capacity (high-low)", [("capacity", -1)]),
+              "capacity": ("Capacity (high-low)", [("layout.capacity", -1), ("capacity", -1)]),
               "building": ("Building (A-Z)", [("building", 1), ("hall_name", 1)])}
 
 
@@ -441,8 +583,20 @@ def halls_page():
 def hall_from_form():
     f = request.form
     rows, cols = max(1, min(26, form_int("rows", 5))), max(1, form_int("columns", 6))
-    return {"hall_name": f["hall_name"].strip(), "building": f.get("building", "").strip(),
-            "rows": rows, "columns": cols, "capacity": rows * cols}
+    cap = rows * cols
+    return {
+        "hall_name": f["hall_name"].strip(),
+        "building": f.get("building", "").strip(),
+        # Embedded / Nested subdocument
+        "layout": {
+            "rows": rows,
+            "columns": cols,
+            "capacity": cap
+        },
+        "rows": rows,
+        "columns": cols,
+        "capacity": cap
+    }
 
 
 @app.route("/admin/halls/add", methods=["POST"])
@@ -450,7 +604,7 @@ def hall_from_form():
 def hall_add():
     doc = hall_from_form()
     try:
-        doc["image"] = store_image(request.files.get("image"), doc["hall_name"])  # GridFS upload
+        doc["image"] = store_image(request.files.get("image"), doc["hall_name"])  # GridFS upload embedded
     except ValueError as e:
         flash(str(e), "error")
         return redirect(url_for("halls_page"))
@@ -469,7 +623,10 @@ def hall_add():
 def hall_edit(hid):
     hall = db.halls.find_one({"_id": oid(hid)}) or abort(404)
     doc = hall_from_form()
-    if (doc["rows"], doc["columns"]) != (hall["rows"], hall["columns"]) and \
+    old_rows = get_hall_rows(hall)
+    old_cols = get_hall_cols(hall)
+
+    if (doc["rows"], doc["columns"]) != (old_rows, old_cols) and \
             db.seatings.count_documents({"hall_id": hall["_id"]}):
         flash("Cannot change the layout while seats are allotted in this hall.", "error")
         return redirect(url_for("halls_page"))
@@ -483,6 +640,11 @@ def hall_edit(hid):
         doc["image"] = new_img
     try:
         db.halls.update_one({"_id": hall["_id"]}, {"$set": doc})
+        # update embedded hall_name in student records
+        db.students.update_many(
+            {"exam_details.hall_id": hall["_id"]},
+            {"$set": {"exam_details.$.hall_name": doc["hall_name"], "exam_details.$.building": doc["building"]}}
+        )
         flash("Hall updated.", "success")
     except DuplicateKeyError:
         if new_img:
@@ -524,33 +686,49 @@ def seatings_page():
         match["register_no"] = {"$regex": "^" + re.escape(a["q"].strip().upper())}
     sort = a.get("sort", "seat")
     items = list(db.seatings.aggregate(seating_pipeline(match, SEAT_SORTS.get(sort, SEAT_SORTS["seat"])[1])))
+    depts = set(db.students.distinct("academic.department") + db.students.distinct("department"))
+    departments = sorted(d for d in depts if d)
+
     return render_template("seatings.html", items=items, sort=sort,
                            sorts=[(k, v[0]) for k, v in SEAT_SORTS.items()],
-                           exams=list(db.exams.find().sort("exam_date", 1)),
+                           exams=list(db.exams.find().sort("schedule.exam_date", 1)),
                            halls=list(db.halls.find().sort("hall_name", 1)),
-                           departments=sorted(db.students.distinct("department")))
+                           departments=departments)
 
 
 @app.route("/admin/seatings/generate", methods=["POST"])
 @login_required
 def seatings_generate():
     exam = db.exams.find_one({"_id": oid(request.form.get("exam_id"))}) or abort(404)
-    department = request.form.get("department", "").strip()
+    department = request.form.get("department", "").strip().upper()
     chosen = [oid(h) for h in request.form.getlist("hall_ids")]
 
-    # students sorted by MongoDB
-    students = list(db.students.find({"department": department} if department else {})
-                    .sort("register_no", ASCENDING))
-    # halls already used by another exam in the same date/time slot are unavailable
-    clash = [e["_id"] for e in db.exams.find({"_id": {"$ne": exam["_id"]}, "exam_date": exam["exam_date"],
-                                              "start_time": exam["start_time"]})]
+    # Query students using embedded academic.department or department
+    stu_q = {}
+    if department:
+        stu_q = {"$or": [{"academic.department": department}, {"department": department}]}
+    students = list(db.students.find(stu_q).sort("register_no", ASCENDING))
+
+    # check schedule clashes
+    edate = exam.get("schedule", {}).get("exam_date") or exam.get("exam_date")
+    stime = exam.get("schedule", {}).get("start_time") or exam.get("start_time")
+    dur = exam.get("schedule", {}).get("duration") or exam.get("duration", 180)
+
+    clash_q = {
+        "_id": {"$ne": exam["_id"]},
+        "$or": [
+            {"schedule.exam_date": edate, "schedule.start_time": stime},
+            {"exam_date": edate, "start_time": stime}
+        ]
+    }
+    clash = [e["_id"] for e in db.exams.find(clash_q)]
     busy = db.seatings.distinct("hall_id", {"exam_id": {"$in": clash}})
     hall_q = {"_id": {"$nin": busy}}
     if chosen:
         hall_q["_id"]["$in"] = chosen
     halls = list(db.halls.find(hall_q).sort("hall_name", ASCENDING))
 
-    capacity = sum(h["capacity"] for h in halls)
+    capacity = sum(get_hall_capacity(h) for h in halls)
     if not students:
         flash("No students match the selection.", "error")
     elif capacity < len(students):
@@ -561,12 +739,46 @@ def seatings_generate():
         seatings, ops = [], []
         for s, (h, r, c) in zip(students, seat_slots(halls)):
             seat = f"{chr(65 + r)}{c}"
-            seatings.append({"exam_id": exam["_id"], "hall_id": h["_id"], "student_id": s["_id"],
-                             "register_no": s["register_no"], "seat_no": seat, "row": r, "col": c,
-                             "assigned_at": now})
-            ops.append(UpdateOne({"_id": s["_id"]}, {"$push": {"exam_details": {   # embedded document
-                "exam_id": exam["_id"], "subject": exam["subject"], "exam_date": exam["exam_date"],
-                "start_time": exam["start_time"], "hall_id": h["_id"], "seat_no": seat}}}))
+            s_dept = s.get("academic", {}).get("department") or s.get("department", "")
+            seatings.append({
+                "exam_id": exam["_id"],
+                "hall_id": h["_id"],
+                "student_id": s["_id"],
+                "register_no": s["register_no"],
+                "seat_no": seat,
+                "row": r,
+                "col": c,
+                "student_details": {
+                    "register_no": s["register_no"],
+                    "name": s["name"],
+                    "department": s_dept
+                },
+                "seat_info": {
+                    "seat_no": seat,
+                    "row": r,
+                    "col": c
+                },
+                "assigned_at": now
+            })
+            # Embedded subdocument inside student record
+            ops.append(UpdateOne(
+                {"_id": s["_id"]},
+                {"$push": {"exam_details": {
+                    "exam_id": exam["_id"],
+                    "exam_name": exam.get("exam_name", ""),
+                    "subject": exam.get("subject", ""),
+                    "exam_date": edate,
+                    "start_time": stime,
+                    "duration": dur,
+                    "hall_id": h["_id"],
+                    "hall_name": h.get("hall_name", ""),
+                    "building": h.get("building", ""),
+                    "seat_no": seat,
+                    "row": r,
+                    "col": c,
+                    "assigned_at": now
+                }}}
+            ))
         db.seatings.insert_many(seatings)
         db.students.bulk_write(ops)
         used = len({s["hall_id"] for s in seatings})
@@ -581,17 +793,34 @@ def seating_edit(sid):
     hall = db.halls.find_one({"_id": oid(request.form.get("hall_id"))}) or abort(404)
     seat = request.form.get("seat_no", "").strip().upper()
     if not seat_in_hall(hall, seat):
-        flash(f"Seat {seat} does not exist in {hall['hall_name']} ({hall['rows']}x{hall['columns']}).", "error")
+        flash(f"Seat {seat} does not exist in {hall['hall_name']} ({get_hall_rows(hall)}x{get_hall_cols(hall)}).", "error")
         return redirect(request.referrer or url_for("seatings_page"))
     r, c = seat_pos(seat)
     try:
         db.seatings.update_one({"_id": seating["_id"]},
-                               {"$set": {"hall_id": hall["_id"], "seat_no": seat, "row": r, "col": c}})
+                               {"$set": {
+                                   "hall_id": hall["_id"],
+                                   "seat_no": seat,
+                                   "row": r,
+                                   "col": c,
+                                   "seat_info.seat_no": seat,
+                                   "seat_info.row": r,
+                                   "seat_info.col": c
+                               }})
     except DuplicateKeyError:
         flash(f"Seat {seat} in {hall['hall_name']} is already taken for this exam.", "error")
         return redirect(request.referrer or url_for("seatings_page"))
-    db.students.update_one({"_id": seating["student_id"], "exam_details.exam_id": seating["exam_id"]},
-                           {"$set": {"exam_details.$.hall_id": hall["_id"], "exam_details.$.seat_no": seat}})
+    db.students.update_one(
+        {"_id": seating["student_id"], "exam_details.exam_id": seating["exam_id"]},
+        {"$set": {
+            "exam_details.$.hall_id": hall["_id"],
+            "exam_details.$.hall_name": hall["hall_name"],
+            "exam_details.$.building": hall.get("building", ""),
+            "exam_details.$.seat_no": seat,
+            "exam_details.$.row": r,
+            "exam_details.$.col": c
+        }}
+    )
     flash("Seat reassigned.", "success")
     return redirect(request.referrer or url_for("seatings_page"))
 

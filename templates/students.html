@@ -1,54 +1,78 @@
 {% extends "base.html" %}
-{% block title %}Student Records{% endblock %}
+{% block title %}Students Management{% endblock %}
 
 {% block content %}
-<div class="page-header">
-  <div>
-    <h1 class="page-title"><i class="fa-solid fa-user-graduate" style="color: var(--primary);"></i> Student Records</h1>
-    <p class="page-subtitle">Manage student candidate registrations and view their active exam seat assignments</p>
-  </div>
-</div>
+<a class="breadcrumb-back" href="{{ url_for('dashboard') }}">
+  <i class="fa-solid fa-arrow-left"></i> Back to Dashboard
+</a>
 
-<div class="card">
-  <div class="card-header">
-    <h2 class="card-title"><i class="fa-solid fa-user-plus" style="color: var(--primary);"></i> Add New Student</h2>
-  </div>
-  <form method="post" action="{{ url_for('student_add') }}" class="grid">
-    <div>
-      <label>Register Number</label>
-      <input name="register_no" placeholder="e.g. 21CS001" required>
+<h1 class="page-heading">Student Records</h1>
+<p class="page-subtitle">Candidate directory modeled with MongoDB nested academic and contact subdocuments</p>
+
+<div class="form-card">
+  <form method="post" action="{{ url_for('student_add') }}">
+    <div class="form-section">
+      <div class="form-section-title">
+        <i class="fa-solid fa-id-card" style="color: var(--primary);"></i>
+        <span>Basic Student Information</span>
+      </div>
+      <div class="form-grid-2">
+        <div>
+          <label>Register Number</label>
+          <input name="register_no" placeholder="e.g. CSE2024001" required>
+        </div>
+        <div>
+          <label>Full Name</label>
+          <input name="name" placeholder="e.g. John Doe" required>
+        </div>
+      </div>
     </div>
-    <div>
-      <label>Full Name</label>
-      <input name="name" placeholder="e.g. John Doe" required>
+
+    <div class="form-section">
+      <div class="form-section-title">
+        <i class="fa-solid fa-graduation-cap" style="color: var(--primary);"></i>
+        <span>Academic Profile (Nested Document: <code>academic</code>)</span>
+      </div>
+      <div class="form-grid-2">
+        <div>
+          <label>Department Code</label>
+          <input name="department" placeholder="e.g. CSE, ECE, MECH" required>
+        </div>
+        <div>
+          <label>Academic Year (1-6)</label>
+          <input name="year" type="number" min="1" max="6" value="1" required>
+        </div>
+      </div>
     </div>
-    <div>
-      <label>Department</label>
-      <input name="department" placeholder="e.g. CSE, ECE" required>
+
+    <div class="form-section">
+      <div class="form-section-title">
+        <i class="fa-solid fa-address-book" style="color: var(--primary);"></i>
+        <span>Contact Information (Nested Document: <code>contact</code>)</span>
+      </div>
+      <div class="form-grid-2">
+        <div>
+          <label>Email Address</label>
+          <input name="email" type="email" placeholder="student@university.edu">
+        </div>
+        <div>
+          <label>Phone Number</label>
+          <input name="phone" placeholder="+91 9876543210">
+        </div>
+      </div>
     </div>
-    <div>
-      <label>Academic Year (1-6)</label>
-      <input name="year" type="number" min="1" max="6" value="1" required>
-    </div>
-    <div>
-      <label>Email Address</label>
-      <input name="email" type="email" placeholder="student@university.edu">
-    </div>
-    <div>
-      <label>Phone Number</label>
-      <input name="phone" placeholder="+91 9876543210">
-    </div>
-    <div>
-      <button type="submit" class="btn" style="width: 100%;">
-        <i class="fa-solid fa-plus"></i> Add Student
+
+    <div class="form-actions">
+      <button type="submit" class="btn">
+        <i class="fa-solid fa-plus"></i> Save Student Record
       </button>
     </div>
   </form>
 </div>
 
-<form class="filters" method="get">
+<form class="filter-card" method="get">
   <label><i class="fa-solid fa-magnifying-glass" style="color: var(--primary);"></i> Search:</label>
-  <input name="q" placeholder="Name or register number…" value="{{ request.args.get('q', '') }}">
+  <input name="q" placeholder="Search by name or register no…" value="{{ request.args.get('q', '') }}">
 
   <label>Department:</label>
   <select name="department">
@@ -77,111 +101,114 @@
 
   <button type="submit" class="btn small"><i class="fa-solid fa-check"></i> Apply</button>
   {% if request.args.get('q') or request.args.get('department') or request.args.get('exam') %}
-    <a href="{{ url_for('students_page') }}" class="btn small secondary"><i class="fa-solid fa-xmark"></i> Clear</a>
+    <a href="{{ url_for('students_page') }}" class="btn small secondary"><i class="fa-solid fa-xmark"></i> Reset</a>
   {% endif %}
 </form>
 
-<div class="card scroll">
-  <table>
-    <thead>
-      <tr>
-        <th>Register No</th>
-        <th>Student Name</th>
-        <th>Dept &amp; Year</th>
-        <th>Contact Info</th>
-        <th>Assigned Seating</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for s in items %}
-      <tr>
-        <td><span class="tag"><strong>{{ s.register_no }}</strong></span></td>
-        <td><strong>{{ s.name }}</strong></td>
-        <td>
-          <span class="badge primary">{{ s.department }}</span>
-          <span class="muted small-text">Year {{ s.year }}</span>
-        </td>
-        <td>
-          {% if s.email %}<div><i class="fa-regular fa-envelope muted"></i> {{ s.email }}</div>{% endif %}
-          {% if s.phone %}<div><i class="fa-solid fa-phone muted"></i> {{ s.phone }}</div>{% endif %}
-          {% if not s.email and not s.phone %}<span class="muted">-</span>{% endif %}
-        </td>
-        <td>
-          {% for d in s.exam_details %}
-            <span class="tag accent">
-              {{ d.subject }} · {{ halls.get(d.hall_id, {}).hall_name or 'Hall' }} · <strong>{{ d.seat_no }}</strong>
-            </span>
-          {% else %}
-            <span class="muted small-text">Not seated</span>
-          {% endfor %}
-        </td>
-        <td>
-          <div style="display: flex; gap: 0.35rem; align-items: center;">
-            <button type="button" class="btn small secondary" onclick="openModal('edit-student-{{ s._id }}')" title="Edit student">
-              <i class="fa-solid fa-pen-to-square"></i>
-            </button>
-            <form method="post" action="{{ url_for('student_delete', sid=s._id) }}" data-confirm="Are you sure you want to delete student {{ s.name }} and their allotments?">
-              <button type="submit" class="btn small danger" title="Delete student">
-                <i class="fa-solid fa-trash-can"></i>
+<div class="table-card">
+  <div class="table-responsive">
+    <table>
+      <thead>
+        <tr>
+          <th>Register No</th>
+          <th>Student Name</th>
+          <th>Academic (Dept &amp; Year)</th>
+          <th>Contact Info</th>
+          <th>Embedded <code>exam_details</code></th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in items %}
+        <tr>
+          <td><span class="tag"><strong>{{ s.register_no }}</strong></span></td>
+          <td><strong>{{ s.name }}</strong></td>
+          <td>
+            <span class="badge primary">{{ s.get('academic', {}).get('department') or s.department }}</span>
+            <span class="muted small-text">Year {{ s.get('academic', {}).get('year') or s.year }}</span>
+          </td>
+          <td>
+            {% set email = s.get('contact', {}).get('email') or s.email %}
+            {% set phone = s.get('contact', {}).get('phone') or s.phone %}
+            {% if email %}<div><i class="fa-regular fa-envelope muted"></i> {{ email }}</div>{% endif %}
+            {% if phone %}<div><i class="fa-solid fa-phone muted"></i> {{ phone }}</div>{% endif %}
+            {% if not email and not phone %}<span class="muted">-</span>{% endif %}
+          </td>
+          <td>
+            {% for d in s.exam_details %}
+              <span class="tag accent">
+                <i class="fa-solid fa-file-signature"></i> {{ d.subject }} · {{ d.hall_name or halls.get(d.hall_id, {}).hall_name or 'Hall' }} · <strong>{{ d.seat_no }}</strong>
+              </span>
+            {% else %}
+              <span class="muted small-text">No seating assigned</span>
+            {% endfor %}
+          </td>
+          <td>
+            <div style="display: flex; gap: 0.35rem; align-items: center;">
+              <button type="button" class="btn small secondary" onclick="openModal('edit-student-{{ s._id }}')" title="Edit student">
+                <i class="fa-solid fa-pen-to-square"></i> Edit
               </button>
+              <form method="post" action="{{ url_for('student_delete', sid=s._id) }}" data-confirm="Delete student {{ s.name }} and allotments?">
+                <button type="submit" class="btn small danger" title="Delete student">
+                  <i class="fa-solid fa-trash-can"></i>
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+
+        <!-- Edit Student Modal -->
+        <div id="edit-student-{{ s._id }}" class="modal-overlay">
+          <div class="modal-dialog">
+            <div class="modal-header">
+              <h3 class="modal-title"><i class="fa-solid fa-pen-to-square" style="color: var(--primary);"></i> Edit: {{ s.name }}</h3>
+              <button type="button" class="modal-close" onclick="closeModal('edit-student-{{ s._id }}')">&times;</button>
+            </div>
+            <form method="post" action="{{ url_for('student_edit', sid=s._id) }}">
+              <div class="modal-body">
+                <div>
+                  <label>Register Number</label>
+                  <input name="register_no" value="{{ s.register_no }}" required>
+                </div>
+                <div>
+                  <label>Student Full Name</label>
+                  <input name="name" value="{{ s.name }}" required>
+                </div>
+                <div class="form-grid-2">
+                  <div>
+                    <label>Department</label>
+                    <input name="department" value="{{ s.get('academic', {}).get('department') or s.department }}" required>
+                  </div>
+                  <div>
+                    <label>Year</label>
+                    <input name="year" type="number" min="1" max="6" value="{{ s.get('academic', {}).get('year') or s.year }}" required>
+                  </div>
+                </div>
+                <div>
+                  <label>Email Address</label>
+                  <input name="email" type="email" value="{{ s.get('contact', {}).get('email') or s.email }}">
+                </div>
+                <div>
+                  <label>Phone Number</label>
+                  <input name="phone" value="{{ s.get('contact', {}).get('phone') or s.phone }}">
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn secondary" onclick="closeModal('edit-student-{{ s._id }}')">Cancel</button>
+                <button type="submit" class="btn success"><i class="fa-solid fa-check"></i> Save Changes</button>
+              </div>
             </form>
           </div>
-        </td>
-      </tr>
-
-      <!-- Edit Student Modal -->
-      <div id="edit-student-{{ s._id }}" class="modal-overlay">
-        <div class="modal-dialog">
-          <div class="modal-header">
-            <h3 class="modal-title"><i class="fa-solid fa-pen-to-square" style="color: var(--primary);"></i> Edit Student: {{ s.name }}</h3>
-            <button type="button" class="modal-close" onclick="closeModal('edit-student-{{ s._id }}')">&times;</button>
-          </div>
-          <form method="post" action="{{ url_for('student_edit', sid=s._id) }}">
-            <div class="modal-body stack">
-              <div>
-                <label>Register Number</label>
-                <input name="register_no" value="{{ s.register_no }}" required>
-              </div>
-              <div>
-                <label>Student Full Name</label>
-                <input name="name" value="{{ s.name }}" required>
-              </div>
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
-                <div>
-                  <label>Department</label>
-                  <input name="department" value="{{ s.department }}" required>
-                </div>
-                <div>
-                  <label>Academic Year</label>
-                  <input name="year" type="number" min="1" max="6" value="{{ s.year }}" required>
-                </div>
-              </div>
-              <div>
-                <label>Email Address</label>
-                <input name="email" type="email" value="{{ s.email }}">
-              </div>
-              <div>
-                <label>Phone Number</label>
-                <input name="phone" value="{{ s.phone }}">
-              </div>
-            </div>
-            <div class="modal-footer">
-              <button type="button" class="btn secondary" onclick="closeModal('edit-student-{{ s._id }}')">Cancel</button>
-              <button type="submit" class="btn success"><i class="fa-solid fa-check"></i> Save Changes</button>
-            </div>
-          </form>
         </div>
-      </div>
-      {% else %}
-      <tr>
-        <td colspan="6" class="center muted" style="padding: 2.5rem;">
-          <i class="fa-solid fa-users-slash" style="font-size: 2rem; display: block; margin-bottom: 0.5rem; opacity: 0.4;"></i>
-          No student records found matching the query.
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+        {% else %}
+        <tr>
+          <td colspan="6" class="muted" style="text-align: center; padding: 2.5rem;">
+            No students found matching your query.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 {% endblock %}

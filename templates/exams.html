@@ -1,48 +1,63 @@
 {% extends "base.html" %}
-{% block title %}Examinations Schedule{% endblock %}
+{% block title %}Exams Management{% endblock %}
 
 {% block content %}
-<div class="page-header">
-  <div>
-    <h1 class="page-title"><i class="fa-solid fa-file-pen" style="color: var(--primary);"></i> Exam Schedule</h1>
-    <p class="page-subtitle">Schedule examinations, download printable seating PDFs, and notify students</p>
-  </div>
-</div>
+<a class="breadcrumb-back" href="{{ url_for('dashboard') }}">
+  <i class="fa-solid fa-arrow-left"></i> Back to Dashboard
+</a>
 
-<div class="card">
-  <div class="card-header">
-    <h2 class="card-title"><i class="fa-solid fa-calendar-plus" style="color: var(--primary);"></i> Schedule New Exam</h2>
-  </div>
-  <form method="post" action="{{ url_for('exam_add') }}" class="grid">
-    <div>
-      <label>Exam Name</label>
-      <input name="exam_name" placeholder="e.g. End Semester Nov 2026" required>
+<h1 class="page-heading">Examination Schedules</h1>
+<p class="page-subtitle">Manage examination timetables with MongoDB nested schedule subdocuments</p>
+
+<div class="form-card">
+  <form method="post" action="{{ url_for('exam_add') }}">
+    <div class="form-section">
+      <div class="form-section-title">
+        <i class="fa-solid fa-file-pen" style="color: var(--primary);"></i>
+        <span>Examination Title &amp; Subject</span>
+      </div>
+      <div class="form-grid-2">
+        <div>
+          <label>Exam Title</label>
+          <input name="exam_name" placeholder="e.g. End Semester Nov 2026" required>
+        </div>
+        <div>
+          <label>Subject / Course</label>
+          <input name="subject" placeholder="e.g. Web Framework using Python" required>
+        </div>
+      </div>
     </div>
-    <div>
-      <label>Subject</label>
-      <input name="subject" placeholder="e.g. Data Structures" required>
+
+    <div class="form-section">
+      <div class="form-section-title">
+        <i class="fa-solid fa-calendar-clock" style="color: var(--primary);"></i>
+        <span>Schedule Timetable (Nested Document: <code>schedule</code>)</span>
+      </div>
+      <div class="form-grid-3">
+        <div>
+          <label>Exam Date</label>
+          <input name="exam_date" type="date" required>
+        </div>
+        <div>
+          <label>Start Time</label>
+          <input name="start_time" type="time" required>
+        </div>
+        <div>
+          <label>Duration (Minutes)</label>
+          <input name="duration" type="number" value="180" min="15" required>
+        </div>
+      </div>
     </div>
-    <div>
-      <label>Exam Date</label>
-      <input name="exam_date" type="date" required>
-    </div>
-    <div>
-      <label>Start Time</label>
-      <input name="start_time" type="time" required>
-    </div>
-    <div>
-      <label>Duration (Mins)</label>
-      <input name="duration" type="number" value="180" min="15" required>
-    </div>
-    <div>
-      <button type="submit" class="btn" style="width: 100%;">
-        <i class="fa-solid fa-plus"></i> Create Exam
+
+    <div class="form-actions">
+      <button type="submit" class="btn">
+        <i class="fa-solid fa-plus"></i> Schedule Examination
       </button>
     </div>
   </form>
 </div>
 
-<form class="filters" method="get">
+<form class="filter-card" method="get">
   <label><i class="fa-solid fa-filter" style="color: var(--primary);"></i> Date:</label>
   <input type="date" name="date" value="{{ request.args.get('date', '') }}">
 
@@ -59,106 +74,110 @@
   {% endif %}
 </form>
 
-<div class="card scroll">
-  <table>
-    <thead>
-      <tr>
-        <th>Exam Title</th>
-        <th>Subject</th>
-        <th>Schedule</th>
-        <th>Duration</th>
-        <th>Seated</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for e in items %}
-      <tr>
-        <td><strong>{{ e.exam_name }}</strong></td>
-        <td><span class="tag accent">{{ e.subject }}</span></td>
-        <td>
-          <div><i class="fa-regular fa-calendar" style="color: var(--primary);"></i> {{ e.exam_date }}</div>
-          <div class="muted small-text"><i class="fa-regular fa-clock"></i> {{ e.start_time }}</div>
-        </td>
-        <td>{{ e.duration }} mins</td>
-        <td>
-          <span class="badge {% if counts.get(e._id, 0) > 0 %}success{% else %}primary{% endif %}">
-            <i class="fa-solid fa-chair"></i> {{ counts.get(e._id, 0) }} candidates
-          </span>
-        </td>
-        <td>
-          <div style="display: flex; gap: 0.35rem; align-items: center;">
-            <a class="btn small" href="{{ url_for('seatings_page', exam=e._id) }}" title="View and assign seating">
-              <i class="fa-solid fa-users-viewfinder"></i> Seats
-            </a>
-            <a class="btn small secondary" href="{{ url_for('exam_pdf', eid=e._id) }}" title="Download Printable PDF">
-              <i class="fa-solid fa-file-pdf" style="color: var(--danger);"></i> PDF
-            </a>
-            <form method="post" action="{{ url_for('exam_notify', eid=e._id) }}" data-confirm="Send email/SMS notification to all candidates seated for this exam?">
-              <button type="submit" class="btn small secondary" title="Notify candidates">
-                <i class="fa-solid fa-paper-plane" style="color: var(--primary);"></i>
+<div class="table-card">
+  <div class="table-responsive">
+    <table>
+      <thead>
+        <tr>
+          <th>Exam Title</th>
+          <th>Subject</th>
+          <th>Nested Schedule (Date &amp; Time)</th>
+          <th>Duration</th>
+          <th>Seated</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in items %}
+        {% set edate = e.get('schedule', {}).get('exam_date') or e.exam_date %}
+        {% set stime = e.get('schedule', {}).get('start_time') or e.start_time %}
+        {% set dur = e.get('schedule', {}).get('duration') or e.duration %}
+        <tr>
+          <td><strong>{{ e.exam_name }}</strong></td>
+          <td><span class="tag accent">{{ e.subject }}</span></td>
+          <td>
+            <div><i class="fa-regular fa-calendar" style="color: var(--primary);"></i> {{ edate }}</div>
+            <div class="muted small-text"><i class="fa-regular fa-clock"></i> {{ stime }}</div>
+          </td>
+          <td>{{ dur }} mins</td>
+          <td>
+            <span class="badge {% if counts.get(e._id, 0) > 0 %}success{% else %}primary{% endif %}">
+              <i class="fa-solid fa-chair"></i> {{ counts.get(e._id, 0) }} candidates
+            </span>
+          </td>
+          <td>
+            <div style="display: flex; gap: 0.35rem; align-items: center;">
+              <a class="btn small" href="{{ url_for('seatings_page', exam=e._id) }}" title="View Seats">
+                <i class="fa-solid fa-users-viewfinder"></i> Seats
+              </a>
+              <a class="btn small secondary" href="{{ url_for('exam_pdf', eid=e._id) }}" title="Download PDF">
+                <i class="fa-solid fa-file-pdf" style="color: var(--danger);"></i> PDF
+              </a>
+              <form method="post" action="{{ url_for('exam_notify', eid=e._id) }}" data-confirm="Notify candidates via Email/SMS?">
+                <button type="submit" class="btn small secondary" title="Notify">
+                  <i class="fa-solid fa-paper-plane" style="color: var(--primary);"></i>
+                </button>
+              </form>
+              <button type="button" class="btn small secondary" onclick="openModal('edit-exam-{{ e._id }}')" title="Edit">
+                <i class="fa-solid fa-pen-to-square"></i>
               </button>
-            </form>
-            <button type="button" class="btn small secondary" onclick="openModal('edit-exam-{{ e._id }}')" title="Edit exam details">
-              <i class="fa-solid fa-pen-to-square"></i>
-            </button>
-            <form method="post" action="{{ url_for('exam_delete', eid=e._id) }}" data-confirm="Are you sure you want to delete this exam and its seating arrangement?">
-              <button type="submit" class="btn small danger" title="Delete exam">
-                <i class="fa-solid fa-trash-can"></i>
-              </button>
-            </form>
-          </div>
-        </td>
-      </tr>
+              <form method="post" action="{{ url_for('exam_delete', eid=e._id) }}" data-confirm="Delete this exam and its seating?">
+                <button type="submit" class="btn small danger" title="Delete">
+                  <i class="fa-solid fa-trash-can"></i>
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
 
-      <!-- Edit Exam Modal -->
-      <div id="edit-exam-{{ e._id }}" class="modal-overlay">
-        <div class="modal-dialog">
-          <div class="modal-header">
-            <h3 class="modal-title"><i class="fa-solid fa-pen-to-square" style="color: var(--primary);"></i> Edit Exam Details</h3>
-            <button type="button" class="modal-close" onclick="closeModal('edit-exam-{{ e._id }}')">&times;</button>
+        <!-- Edit Exam Modal -->
+        <div id="edit-exam-{{ e._id }}" class="modal-overlay">
+          <div class="modal-dialog">
+            <div class="modal-header">
+              <h3 class="modal-title"><i class="fa-solid fa-pen-to-square" style="color: var(--primary);"></i> Edit Exam</h3>
+              <button type="button" class="modal-close" onclick="closeModal('edit-exam-{{ e._id }}')">&times;</button>
+            </div>
+            <form method="post" action="{{ url_for('exam_edit', eid=e._id) }}">
+              <div class="modal-body">
+                <div>
+                  <label>Exam Title</label>
+                  <input name="exam_name" value="{{ e.exam_name }}" required>
+                </div>
+                <div>
+                  <label>Subject</label>
+                  <input name="subject" value="{{ e.subject }}" required>
+                </div>
+                <div class="form-grid-2">
+                  <div>
+                    <label>Exam Date</label>
+                    <input name="exam_date" type="date" value="{{ edate }}" required>
+                  </div>
+                  <div>
+                    <label>Start Time</label>
+                    <input name="start_time" type="time" value="{{ stime }}" required>
+                  </div>
+                </div>
+                <div>
+                  <label>Duration (Minutes)</label>
+                  <input name="duration" type="number" value="{{ dur }}" required>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn secondary" onclick="closeModal('edit-exam-{{ e._id }}')">Cancel</button>
+                <button type="submit" class="btn success"><i class="fa-solid fa-check"></i> Save Changes</button>
+              </div>
+            </form>
           </div>
-          <form method="post" action="{{ url_for('exam_edit', eid=e._id) }}">
-            <div class="modal-body stack">
-              <div>
-                <label>Exam Name</label>
-                <input name="exam_name" value="{{ e.exam_name }}" required>
-              </div>
-              <div>
-                <label>Subject</label>
-                <input name="subject" value="{{ e.subject }}" required>
-              </div>
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
-                <div>
-                  <label>Exam Date</label>
-                  <input name="exam_date" type="date" value="{{ e.exam_date }}" required>
-                </div>
-                <div>
-                  <label>Start Time</label>
-                  <input name="start_time" type="time" value="{{ e.start_time }}" required>
-                </div>
-              </div>
-              <div>
-                <label>Duration (Minutes)</label>
-                <input name="duration" type="number" value="{{ e.duration }}" required>
-              </div>
-            </div>
-            <div class="modal-footer">
-              <button type="button" class="btn secondary" onclick="closeModal('edit-exam-{{ e._id }}')">Cancel</button>
-              <button type="submit" class="btn success"><i class="fa-solid fa-check"></i> Save Changes</button>
-            </div>
-          </form>
         </div>
-      </div>
-      {% else %}
-      <tr>
-        <td colspan="6" class="center muted" style="padding: 2.5rem;">
-          <i class="fa-solid fa-file-circle-question" style="font-size: 2rem; display: block; margin-bottom: 0.5rem; opacity: 0.4;"></i>
-          No examinations scheduled yet. Use the form above to schedule your first exam.
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+        {% else %}
+        <tr>
+          <td colspan="6" class="muted" style="text-align: center; padding: 2.5rem;">
+            No examinations scheduled. Use the form above to schedule your first exam.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 {% endblock %}

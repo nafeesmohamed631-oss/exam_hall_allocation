@@ -1,62 +1,72 @@
 {% extends "base.html" %}
-{% block title %}Seating Arrangements{% endblock %}
+{% block title %}Seatings Management{% endblock %}
 
 {% block content %}
-<div class="page-header">
-  <div>
-    <h1 class="page-title"><i class="fa-solid fa-chair" style="color: var(--primary);"></i> Seating Arrangements</h1>
-    <p class="page-subtitle">Automatic clash-free seat allocation, student desk mapping, and reassignments</p>
-  </div>
-</div>
+<a class="breadcrumb-back" href="{{ url_for('dashboard') }}">
+  <i class="fa-solid fa-arrow-left"></i> Back to Dashboard
+</a>
 
-<div class="card">
-  <div class="card-header">
-    <h2 class="card-title"><i class="fa-solid fa-wand-magic-sparkles" style="color: var(--primary);"></i> Generate Allocation Automatically</h2>
-  </div>
-  <form method="post" action="{{ url_for('seatings_generate') }}" class="grid">
-    <div>
-      <label>Target Examination</label>
-      <select name="exam_id" required>
-        <option value="">Select Exam</option>
-        {% for e in exams %}
-          <option value="{{ e._id }}" {{ 'selected' if request.args.get('exam') == e._id|string }}>
-            {{ e.exam_name }} - {{ e.subject }} ({{ e.exam_date }})
-          </option>
-        {% endfor %}
-      </select>
+<h1 class="page-heading">Seating Arrangements</h1>
+<p class="page-subtitle">Generate conflict-free seat allotments and push embedded documents into candidate records</p>
+
+<div class="form-card">
+  <form method="post" action="{{ url_for('seatings_generate') }}">
+    <div class="form-section">
+      <div class="form-section-title">
+        <i class="fa-solid fa-wand-magic-sparkles" style="color: var(--primary);"></i>
+        <span>Automated Allocation Parameters</span>
+      </div>
+      <div class="form-grid-2">
+        <div>
+          <label>Target Examination</label>
+          <select name="exam_id" required>
+            <option value="">-- Choose Exam --</option>
+            {% for e in exams %}
+              {% set edate = e.get('schedule', {}).get('exam_date') or e.exam_date %}
+              <option value="{{ e._id }}" {{ 'selected' if request.args.get('exam') == e._id|string }}>
+                {{ e.exam_name }} - {{ e.subject }} ({{ edate }})
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label>Filter Candidate Department (Optional)</label>
+          <select name="department">
+            <option value="">All Departments</option>
+            {% for d in departments %}
+              <option>{{ d }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
     </div>
 
-    <div>
-      <label>Filter Department</label>
-      <select name="department">
-        <option value="">All Departments</option>
-        {% for d in departments %}
-          <option>{{ d }}</option>
-        {% endfor %}
-      </select>
+    <div class="form-section">
+      <div class="form-section-title">
+        <i class="fa-solid fa-building-columns" style="color: var(--primary);"></i>
+        <span>Designate Examination Halls</span>
+      </div>
+      <div>
+        <label>Pick Halls (Hold Ctrl for multiple selection; leave empty for all available)</label>
+        <select name="hall_ids" multiple size="3">
+          {% for h in halls %}
+            {% set cap = h.get('layout', {}).get('capacity') or h.capacity %}
+            <option value="{{ h._id }}">{{ h.hall_name }} (Capacity: {{ cap }} desks)</option>
+          {% endfor %}
+        </select>
+      </div>
     </div>
 
-    <div>
-      <label>Halls (Ctrl to select multiple)</label>
-      <select name="hall_ids" multiple size="3" title="Hold Ctrl to pick specific halls (none = all available)">
-        {% for h in halls %}
-          <option value="{{ h._id }}">{{ h.hall_name }} (Cap: {{ h.capacity }})</option>
-        {% endfor %}
-      </select>
-    </div>
-
-    <div>
-      <button type="submit" class="btn" style="width: 100%;">
-        <i class="fa-solid fa-gears"></i> Run Allocation
+    <div class="form-actions">
+      <button type="submit" class="btn">
+        <i class="fa-solid fa-gears"></i> Execute Allocation
       </button>
     </div>
   </form>
-  <div class="muted small-text" style="margin-top: 0.5rem;">
-    <i class="fa-solid fa-circle-info" style="color: var(--primary);"></i> Students are sorted by register number and allocated sequentially into available halls. Re-generating overwrites previous arrangement for that exam.
-  </div>
 </div>
 
-<form class="filters" method="get">
+<form class="filter-card" method="get">
   <label><i class="fa-solid fa-magnifying-glass" style="color: var(--primary);"></i> Search:</label>
   <input name="q" placeholder="Register number prefix…" value="{{ request.args.get('q', '') }}">
 
@@ -89,84 +99,87 @@
 
   <button type="submit" class="btn small"><i class="fa-solid fa-filter"></i> Apply</button>
   {% if request.args.get('q') or request.args.get('exam') or request.args.get('hall') %}
-    <a href="{{ url_for('seatings_page') }}" class="btn small secondary"><i class="fa-solid fa-xmark"></i> Clear</a>
+    <a href="{{ url_for('seatings_page') }}" class="btn small secondary"><i class="fa-solid fa-xmark"></i> Reset</a>
   {% endif %}
 </form>
 
-<div class="card scroll">
-  <table>
-    <thead>
-      <tr>
-        <th>Register No</th>
-        <th>Candidate Name</th>
-        <th>Exam &amp; Subject</th>
-        <th>Hall Name</th>
-        <th>Seat No</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for r in items %}
-      <tr>
-        <td><span class="tag"><strong>{{ r.register_no }}</strong></span></td>
-        <td><strong>{{ r.student.name }}</strong></td>
-        <td>{{ r.exam.subject }} <span class="muted small-text">({{ r.exam.exam_name }})</span></td>
-        <td><i class="fa-solid fa-building-columns muted"></i> {{ r.hall.hall_name }}</td>
-        <td><span class="badge primary" style="font-size: 0.95rem;">{{ r.seat_no }}</span></td>
-        <td>
-          <div style="display: flex; gap: 0.35rem; align-items: center;">
-            <button type="button" class="btn small secondary" onclick="openModal('reassign-seat-{{ r._id }}')">
-              <i class="fa-solid fa-arrows-split-up-and-left"></i> Reassign
-            </button>
-            <form method="post" action="{{ url_for('seating_delete', sid=r._id) }}" data-confirm="Remove this student's seat allotment?">
-              <button type="submit" class="btn small danger" title="Remove allotment">
-                <i class="fa-solid fa-trash-can"></i>
+<div class="table-card">
+  <div class="table-responsive">
+    <table>
+      <thead>
+        <tr>
+          <th>Register No</th>
+          <th>Student Name</th>
+          <th>Exam &amp; Subject</th>
+          <th>Hall Location</th>
+          <th>Allotted Desk</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in items %}
+        <tr>
+          <td><span class="tag"><strong>{{ r.register_no }}</strong></span></td>
+          <td><strong>{{ r.student.name }}</strong></td>
+          <td>{{ r.exam.subject }} <span class="muted small-text">({{ r.exam.exam_name }})</span></td>
+          <td><i class="fa-solid fa-building-columns muted"></i> {{ r.hall.hall_name }}</td>
+          <td><span class="badge success" style="font-size: 0.95rem;">{{ r.seat_no }}</span></td>
+          <td>
+            <div style="display: flex; gap: 0.35rem; align-items: center;">
+              <button type="button" class="btn small secondary" onclick="openModal('reassign-seat-{{ r._id }}')">
+                <i class="fa-solid fa-arrows-split-up-and-left"></i> Reassign
               </button>
+              <form method="post" action="{{ url_for('seating_delete', sid=r._id) }}" data-confirm="Remove this seat allotment?">
+                <button type="submit" class="btn small danger" title="Delete">
+                  <i class="fa-solid fa-trash-can"></i>
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+
+        <!-- Reassign Modal -->
+        <div id="reassign-seat-{{ r._id }}" class="modal-overlay">
+          <div class="modal-dialog">
+            <div class="modal-header">
+              <h3 class="modal-title"><i class="fa-solid fa-arrows-split-up-and-left" style="color: var(--primary);"></i> Reassign: {{ r.student.name }}</h3>
+              <button type="button" class="modal-close" onclick="closeModal('reassign-seat-{{ r._id }}')">&times;</button>
+            </div>
+            <form method="post" action="{{ url_for('seating_edit', sid=r._id) }}">
+              <div class="modal-body">
+                <div>
+                  <label>Examination Hall</label>
+                  <select name="hall_id">
+                    {% for h in halls %}
+                      {% set r_cnt = h.get('layout', {}).get('rows') or h.rows or 5 %}
+                      {% set c_cnt = h.get('layout', {}).get('columns') or h.columns or 6 %}
+                      <option value="{{ h._id }}" {{ 'selected' if h._id == r.hall_id }}>
+                        {{ h.hall_name }} ({{ r_cnt }}×{{ c_cnt }} desks)
+                      </option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div>
+                  <label>Desk Number (e.g. A1, B3)</label>
+                  <input name="seat_no" value="{{ r.seat_no }}" placeholder="e.g. B3" required>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn secondary" onclick="closeModal('reassign-seat-{{ r._id }}')">Cancel</button>
+                <button type="submit" class="btn success"><i class="fa-solid fa-check"></i> Save Reassignment</button>
+              </div>
             </form>
           </div>
-        </td>
-      </tr>
-
-      <!-- Reassign Modal -->
-      <div id="reassign-seat-{{ r._id }}" class="modal-overlay">
-        <div class="modal-dialog">
-          <div class="modal-header">
-            <h3 class="modal-title"><i class="fa-solid fa-arrows-split-up-and-left" style="color: var(--primary);"></i> Reassign: {{ r.student.name }}</h3>
-            <button type="button" class="modal-close" onclick="closeModal('reassign-seat-{{ r._id }}')">&times;</button>
-          </div>
-          <form method="post" action="{{ url_for('seating_edit', sid=r._id) }}">
-            <div class="modal-body stack">
-              <div>
-                <label>Select Examination Hall</label>
-                <select name="hall_id">
-                  {% for h in halls %}
-                    <option value="{{ h._id }}" {{ 'selected' if h._id == r.hall_id }}>
-                      {{ h.hall_name }} ({{ h.rows }}×{{ h.columns }} = {{ h.capacity }} seats)
-                    </option>
-                  {% endfor %}
-                </select>
-              </div>
-              <div>
-                <label>New Seat Number (e.g. B3, A1)</label>
-                <input name="seat_no" value="{{ r.seat_no }}" placeholder="e.g. B3" required>
-              </div>
-            </div>
-            <div class="modal-footer">
-              <button type="button" class="btn secondary" onclick="closeModal('reassign-seat-{{ r._id }}')">Cancel</button>
-              <button type="submit" class="btn success"><i class="fa-solid fa-check"></i> Save Reassignment</button>
-            </div>
-          </form>
         </div>
-      </div>
-      {% else %}
-      <tr>
-        <td colspan="6" class="center muted" style="padding: 2.5rem;">
-          <i class="fa-solid fa-chair" style="font-size: 2rem; display: block; margin-bottom: 0.5rem; opacity: 0.4;"></i>
-          No seating records found. Select an exam above to generate the arrangement.
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+        {% else %}
+        <tr>
+          <td colspan="6" class="muted" style="text-align: center; padding: 2.5rem;">
+            No seating records found. Select an exam above to generate the arrangement.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 {% endblock %}

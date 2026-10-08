@@ -1,37 +1,44 @@
 {% extends "base.html" %}
 {% block title %}Admin Login{% endblock %}
 
-{% block content %}
-<div class="auth-container">
-  <div class="auth-header">
-    <div class="brand-icon" style="margin: 0 auto 0.5rem auto; width: 44px; height: 44px; font-size: 1.25rem;">
-      <i class="fa-solid fa-user-shield"></i>
+{% block public_content %}
+<div class="auth-box">
+  <div class="auth-box-header">
+    <div class="sidebar-brand-icon" style="margin: 0 auto 0.75rem auto; width: 44px; height: 44px; font-size: 1.3rem;">
+      <i class="fa-solid fa-shapes"></i>
     </div>
     <h1>Admin Login</h1>
-    <p class="muted small-text">Enter your credentials to access the management portal</p>
+    <p class="muted small-text">Sign in to manage halls, exams, and candidate allocations</p>
   </div>
 
-  <form method="post" class="stack">
-    <div>
+  <form method="post">
+    <div style="margin-bottom: 1rem;">
       <label for="username">Username</label>
       <input id="username" name="username" placeholder="admin" required autofocus autocomplete="username">
     </div>
 
-    <div>
+    <div style="margin-bottom: 1.25rem;">
       <label for="password">Password</label>
       <input id="password" name="password" type="password" placeholder="••••••••" required autocomplete="current-password">
     </div>
 
-    <button type="submit" class="btn" style="width: 100%; margin-top: 0.5rem;">
-      <i class="fa-solid fa-arrow-right-to-bracket"></i> Sign In
+    <button type="submit" class="btn" style="width: 100%; padding: 0.75rem;">
+      <i class="fa-solid fa-arrow-right-to-bracket"></i> Sign In to Dashboard
     </button>
   </form>
 
   <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border); text-align: center; font-size: 0.85rem;">
-    <span class="muted">Are you a student?</span>
-    <a href="{{ url_for('index') }}" style="font-weight: 600; margin-left: 0.25rem;">
-      <i class="fa-solid fa-magnifying-glass"></i> Find Your Seat
+    <span class="muted">Are you a candidate?</span>
+    <a href="{{ url_for('index') }}" style="font-weight: 600; margin-left: 0.25rem; color: var(--primary);">
+      <i class="fa-solid fa-magnifying-glass"></i> Student Seat Finder
     </a>
   </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="form-card" style="max-width: 440px; margin: 2rem auto;">
+  <p>You are already signed in as <strong>{{ session.admin }}</strong>.</p>
+  <a href="{{ url_for('dashboard') }}" class="btn">Go to Dashboard</a>
 </div>
 {% endblock %}
