@@ -1,6 +1,3 @@
-"""Exam Hall and Seating Arrangement Management System
-Flask + MongoDB (PyMongo) + Nested Documents & GridFS + ReportLab + Flask-Mail
-"""
 import io
 import os
 import re
@@ -534,7 +531,7 @@ def exam_notify(eid):
     sms_client = None
     if sms_on:
         try:
-            from twilio.rest import Client
+            from twilio.rest import Client # type: ignore
             sms_client = Client(os.getenv("TWILIO_SID"), os.getenv("TWILIO_TOKEN"))
         except ImportError:
             flash("Install 'twilio' to enable SMS.", "error")
