@@ -29,13 +29,138 @@
 
 <h1 class="page-heading">Candidate Seat Finder</h1>
 <div class="form-card">
-  <form id="lookupForm" style="max-width: 500px; display: flex; gap: 0.5rem;">
-    <input id="regInput" placeholder="Enter Register No. (e.g. CSE20240001)" required autofocus>
+  <form id="lookupFormAdmin" style="max-width: 500px; display: flex; gap: 0.5rem;">
+    <input id="regInputAdmin" placeholder="Enter Register No. (e.g. CSE20240001)" required autofocus>
     <button type="submit" class="btn">
       <i class="fa-solid fa-magnifying-glass"></i> Search
     </button>
   </form>
 </div>
 
-<div id="result"></div>
+<div id="resultAdmin"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+  function esc(s) {
+    return String(s || "").replace(/[&<>"']/g, function(c) {
+      return {"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c];
+    });
+  }
+
+  function setupLookup(formId, inputId, resultId) {
+    var form = document.getElementById(formId);
+    if (!form) return;
+    var out = document.getElementById(resultId);
+
+    form.addEventListener("submit", async function(e) {
+      e.preventDefault();
+      var regInput = document.getElementById(inputId);
+      var reg = regInput ? regInput.value.trim() : "";
+      if (!reg) return;
+
+      out.innerHTML = `
+        <div class="form-card" style="text-align: center; padding: 2.5rem; color: var(--text-muted);">
+          <i class="fa-solid fa-spinner fa-spin" style="font-size: 2rem; color: var(--primary); margin-bottom: 0.5rem; display: block;"></i>
+          <p>Searching records for <strong>${esc(reg)}</strong>…</p>
+        </div>
+      `;
+
+      try {
+        var res = await fetch("/api/lookup/" + encodeURIComponent(reg));
+        var data = await res.json();
+
+        if (!res.ok) {
+          out.innerHTML = `
+            <div class="flash error">
+              <i class="fa-solid fa-circle-exclamation"></i>
+              <span>${esc(data.error || "No student record found with this register number.")}</span>
+            </div>
+          `;
+          return;
+        }
+
+        var s = data.student;
+        var html = `
+          <div class="form-card" style="border-left: 4px solid var(--primary); margin-bottom: 1.25rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+              <div>
+                <h2 style="margin: 0 0 0.25rem 0; font-size: 1.25rem;">
+                  <i class="fa-solid fa-user-check" style="color: var(--success); margin-right: 0.35rem;"></i>
+                  ${esc(s.name)}
+                </h2>
+                <p class="muted" style="font-size: 0.9rem;">
+                  Register No: <strong style="color: #0f172a;">${esc(s.register_no)}</strong> • Department: <strong>${esc(s.department)}</strong> • Year <strong>${esc(s.year)}</strong>
+                </p>
+              </div>
+              <span class="badge success">
+                <i class="fa-solid fa-check"></i> Registered Student
+              </span>
+            </div>
+          </div>
+        `;
+
+        if (!data.allotments || !data.allotments.length) {
+          html += `
+            <div class="form-card" style="text-align: center; padding: 2.5rem; color: var(--text-muted);">
+              <i class="fa-solid fa-chair" style="font-size: 2rem; opacity: 0.4; display: block; margin-bottom: 0.5rem;"></i>
+              <h3 style="color: #334155; margin-bottom: 0.25rem;">No Seating Allotted Yet</h3>
+              <p>Your seating arrangement has not been generated yet. Please check back before the exam.</p>
+            </div>
+          `;
+        } else {
+          html += `<h3 style="margin-bottom: 0.85rem;"><i class="fa-solid fa-calendar-days" style="color: var(--primary);"></i> Exam Seating Schedule (${data.allotments.length})</h3>`;
+          data.allotments.forEach(function(a) {
+            html += `
+              <div class="form-card" style="display: grid; grid-template-columns: 1fr 220px; gap: 1.25rem; align-items: center; margin-bottom: 1rem;">
+                <div>
+                  <span class="tag accent" style="margin-bottom: 0.4rem;">${esc(a.exam_name)}</span>
+                  <h3 style="font-size: 1.15rem; margin-bottom: 0.5rem;">${esc(a.subject)}</h3>
+                  <p style="font-size: 0.9rem; margin-bottom: 0.3rem;">
+                    <i class="fa-regular fa-calendar" style="color: var(--primary); width: 18px;"></i>
+                    <strong>${esc(a.exam_date)}</strong> at <strong>${esc(a.start_time)}</strong> (${esc(a.duration)} mins)
+                  </p>
+                  <p style="font-size: 0.9rem; margin-bottom: 0.5rem;">
+                    <i class="fa-solid fa-location-dot" style="color: var(--danger); width: 18px;"></i>
+                    <strong>${esc(a.hall_name)}</strong> ${a.building ? "• " + esc(a.building) : ""}
+                  </p>
+                  <div style="background: #f8fafc; border: 1.5px solid var(--primary-border); border-radius: var(--radius-sm); padding: 0.75rem 1.25rem; display: inline-block; margin-top: 0.5rem;">
+                    <div class="muted small-text" style="font-weight: 700; text-transform: uppercase;">Seat Number</div>
+                    <div style="font-size: 2rem; font-weight: 800; color: var(--primary); line-height: 1;">${esc(a.seat_no)}</div>
+                  </div>
+                </div>
+
+                <div>
+                  ${
+                    a.image_url
+                      ? `<img src="${esc(a.image_url)}" alt="${esc(a.hall_name)}" style="width: 100%; height: 140px; object-fit: cover; border-radius: var(--radius-sm); border: 1px solid var(--border);">`
+                      : `<div style="padding: 1.5rem 0.5rem; text-align: center; background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-muted);">
+                           <i class="fa-solid fa-building-columns" style="font-size: 1.5rem; display: block; margin-bottom: 0.35rem;"></i>
+                           <span class="small-text">${esc(a.hall_name)}</span>
+                         </div>`
+                  }
+                </div>
+              </div>
+            `;
+          });
+        }
+
+        out.innerHTML = html;
+      } catch (err) {
+        out.innerHTML = `
+          <div class="flash error">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <span>Connection or server error. Please try again.</span>
+          </div>
+        `;
+      }
+    });
+  }
+
+  // Bind for both public and admin views
+  setupLookup("lookupForm", "regInput", "result");
+  setupLookup("lookupFormAdmin", "regInputAdmin", "resultAdmin");
+})();
+</script>
 {% endblock %}
